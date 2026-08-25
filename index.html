@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Shinobi Clan Sorter</title>
+<style>
+:root{
+  --bg:#0a0b10; --panel:#141722; --panel2:#1b1f2c; --text:#f7f7fb; --muted:#a5adbf;
+  --accent:#ff8a00; --accent2:#ffd166; --line:#2c3142; --good:#71e6a3;
+}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at top,#222a3a 0,#0a0b10 42%,#05060a 100%);color:var(--text);min-height:100vh}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:32px 32px;mask-image:linear-gradient(to bottom,black,transparent 75%)}
+.app{width:min(980px,100%);margin:auto;padding:28px 18px 60px;position:relative;z-index:1}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:24px}.crest{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(from 180deg,var(--accent),#ff3d00,var(--accent2),var(--accent));box-shadow:0 0 28px rgba(255,138,0,.35);font-weight:900;color:#101010}.brand h1{font-size:20px;margin:0}.brand span{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.card{background:linear-gradient(180deg,rgba(25,29,43,.97),rgba(14,17,26,.97));border:1px solid rgba(255,255,255,.08);border-radius:24px;box-shadow:0 22px 70px rgba(0,0,0,.35);overflow:hidden}
+.hero{padding:54px clamp(22px,6vw,70px);min-height:640px;display:flex;flex-direction:column;justify-content:center;position:relative}
+.hero:after{content:"忍";position:absolute;right:-10px;bottom:-75px;font-size:300px;font-weight:900;color:rgba(255,255,255,.025);line-height:1;pointer-events:none}
+.kicker{font-size:12px;text-transform:uppercase;letter-spacing:.22em;color:var(--accent2);font-weight:800}.hero h2{font-size:clamp(42px,8vw,82px);line-height:.93;margin:16px 0 18px;max-width:800px}.hero p{color:var(--muted);font-size:18px;line-height:1.6;max-width:650px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}.btn{appearance:none;border:0;border-radius:14px;padding:14px 20px;font-weight:800;font-size:15px;cursor:pointer;transition:.18s transform,.18s opacity}.btn:hover{transform:translateY(-1px)}.primary{background:linear-gradient(135deg,var(--accent),#ff4d00);color:white;box-shadow:0 10px 28px rgba(255,104,0,.24)}.ghost{background:#222736;color:#eef1f7;border:1px solid #343a4d}
+.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:34px;max-width:620px}.meta div{padding:14px;border:1px solid var(--line);background:#11141d;border-radius:14px}.meta b{display:block;font-size:18px}.meta small{color:var(--muted)}
+.quiz{padding:28px clamp(18px,5vw,54px) 38px}.topline{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:13px;margin-bottom:10px}.progress{height:7px;border-radius:999px;background:#252a38;overflow:hidden}.bar{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s ease}.question{font-size:clamp(26px,4vw,42px);line-height:1.15;margin:34px 0 24px}.answers{display:grid;gap:12px}.answer{border:1px solid #303648;background:#171b27;border-radius:16px;padding:17px 18px;color:#eef1f7;text-align:left;font-size:16px;cursor:pointer;transition:.16s}.answer:hover{border-color:#566079;background:#1d2231;transform:translateX(3px)}
+.result{padding:40px clamp(20px,6vw,64px) 52px}.reveal{text-align:center;padding:18px 0 28px}.sigil{width:118px;height:118px;border-radius:50%;margin:0 auto 20px;display:grid;place-items:center;font-size:58px;font-weight:900;background:radial-gradient(circle at 35% 30%,#fff1c8,#ffae00 34%,#8d2d00 72%,#1a0b06 100%);box-shadow:0 0 60px rgba(255,124,0,.3);border:4px solid rgba(255,255,255,.16)}.result h2{font-size:clamp(42px,8vw,78px);margin:5px 0}.match{color:var(--accent2);font-weight:900;letter-spacing:.08em;text-transform:uppercase}.result-grid{display:grid;grid-template-columns:1.3fr .7fr;gap:18px;margin-top:22px}.box{background:#11141d;border:1px solid var(--line);border-radius:18px;padding:20px}.box h3{margin-top:0}.traits{display:flex;flex-wrap:wrap;gap:8px}.pill{padding:8px 11px;border-radius:999px;background:#242a3a;color:#e8ecf5;font-size:13px}.rank{display:flex;align-items:center;gap:10px;margin:10px 0}.rank .track{height:8px;flex:1;background:#252a38;border-radius:99px;overflow:hidden}.rank .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}.rank span{width:95px;font-size:13px}.rank b{width:42px;text-align:right;font-size:13px}
+.hidden{display:none!important}.foot{text-align:center;color:#6f788d;font-size:12px;margin-top:18px}.small{font-size:13px;color:var(--muted)}
+@media(max-width:720px){.hero{min-height:600px}.meta{grid-template-columns:1fr}.result-grid{grid-template-columns:1fr}.app{padding-top:14px}.brand{padding:0 4px}.hero h2{font-size:48px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="brand"><div class="crest">忍</div><div><h1>Shinobi Clan Sorter</h1><span>Unofficial fan-made personality experience</span></div></div>
+
+  <main class="card">
+    <section id="home" class="hero">
+      <div class="kicker">Find where you belong</div>
+      <h2>Your instincts reveal your clan.</h2>
+      <p>Answer a series of personality and shinobi scenario questions. Your choices are scored across multiple clans to reveal your strongest match, secondary affinities, and combat profile.</p>
+      <div class="actions"><button class="btn primary" id="startBtn">Begin the Test</button><button class="btn ghost" id="howBtn">How scoring works</button></div>
+      <div class="meta"><div><b>10</b><small>Prototype questions</small></div><div><b>8</b><small>Clan outcomes</small></div><div><b>Hidden</b><small>Weighted scoring</small></div></div>
+      <p id="howText" class="small hidden" style="margin-top:18px">Each answer adds different amounts to several clan profiles. Your result is based on the full pattern of your choices—not a single answer.</p>
+    </section>
+
+    <section id="quiz" class="quiz hidden">
+      <div class="topline"><span id="qCount">Question 1 of 10</span><span id="qTheme">Instinct</span></div>
+      <div class="progress"><div id="bar" class="bar"></div></div>
+      <h2 id="question" class="question"></h2>
+      <div id="answers" class="answers"></div>
+    </section>
+
+    <section id="result" class="result hidden">
+      <div class="reveal"><div id="sigil" class="sigil">火</div><div class="kicker">Your clan is</div><h2 id="clanName">Uzumaki</h2><div id="matchText" class="match">87% match</div></div>
+      <div class="result-grid">
+        <div class="box"><h3>Your Shinobi Profile</h3><p id="desc" class="small" style="font-size:15px;line-height:1.65"></p><h3>Strongest Traits</h3><div id="traits" class="traits"></div></div>
+        <div class="box"><h3>Secondary Affinities</h3><div id="rankings"></div><hr style="border:0;border-top:1px solid var(--line);margin:20px 0"><div class="small"><b style="color:white">Likely Chakra Nature</b><br><span id="chakra"></span><br><br><b style="color:white">Combat Style</b><br><span id="style"></span></div></div>
+      </div>
+      <div class="actions" style="justify-content:center;margin-top:28px"><button class="btn primary" id="retakeBtn">Retake Test</button></div>
+    </section>
+  </main>
+  <div class="foot">Fan-made concept. No affiliation with Naruto, Shueisha, TV Tokyo, or associated rights holders.</div>
+</div>
+<script>
+const clans={
+Uchiha:{symbol:'火',traits:['Driven','Intense','Independent','Protective'],chakra:'Fire',style:'Precision offense / counterattack',desc:'You are fueled by conviction. You feel things deeply, hold yourself to demanding standards, and tend to become fiercely protective of the people and goals you choose.'},
+Hyuga:{symbol:'眼',traits:['Disciplined','Observant','Precise','Composed'],chakra:'Lightning',style:'Technical close combat',desc:'You value mastery, awareness, and control. You notice details other people miss and prefer deliberate action over wasted movement.'},
+Uzumaki:{symbol:'渦',traits:['Resilient','Loyal','Energetic','Determined'],chakra:'Wind',style:'High stamina / adaptive assault',desc:'You keep moving when others would stop. Bonds matter heavily to you, and your combination of optimism and stubborn resilience makes you difficult to break.'},
+Nara:{symbol:'影',traits:['Strategic','Calm','Analytical','Efficient'],chakra:'Earth',style:'Control / battlefield strategy',desc:'You naturally search for the smartest path instead of the loudest one. You conserve effort, read situations quickly, and become dangerous when given time to plan.'},
+Akimichi:{symbol:'力',traits:['Warm','Protective','Loyal','Courageous'],chakra:'Earth',style:'Power / frontline protection',desc:'You are relationship-driven and dependable. You may be easygoing in normal situations, but when someone you care about is threatened, you become extremely hard to stop.'},
+Yamanaka:{symbol:'心',traits:['Perceptive','Social','Empathetic','Adaptable'],chakra:'Water',style:'Support / intelligence gathering',desc:'You read people exceptionally well. Communication, intuition, and understanding motives are some of your strongest weapons.'},
+Aburame:{symbol:'蟲',traits:['Reserved','Methodical','Patient','Logical'],chakra:'Earth',style:'Tracking / attrition / control',desc:'You rarely act without a reason. You prefer information, patience, and controlled pressure over impulsive decisions and unnecessary attention.'},
+Inuzuka:{symbol:'牙',traits:['Instinctive','Competitive','Bold','Loyal'],chakra:'Wind',style:'Fast pursuit / aggressive pressure',desc:'You trust your instincts and move decisively. Competition energizes you, and you work best when you can act quickly without being over-managed.'}
+};
+const questions=[
+{theme:'Trust',q:'Someone close to you betrays your trust. What is your first instinct?',a:[
+['Find out why before deciding what happens next.',{Yamanaka:3,Nara:2,Aburame:1}],['Cut them out immediately. Trust is difficult to rebuild.',{Uchiha:3,Hyuga:1}],['Confront them directly and demand an explanation.',{Inuzuka:3,Uzumaki:2}],['Watch quietly and figure out their real motive.',{Aburame:3,Nara:2}],['Forgive them if their regret feels genuine.',{Akimichi:3,Uzumaki:2,Yamanaka:1}]]},
+{theme:'Leadership',q:'Your squad leader’s plan is failing badly. What do you do?',a:[
+['Follow the plan until I am certain changing course is necessary.',{Hyuga:3,Aburame:1}],['Suggest a better strategy immediately.',{Nara:3,Yamanaka:1}],['Quietly adjust my own role to compensate.',{Aburame:3,Hyuga:2}],['Take command if nobody else will.',{Uchiha:3,Uzumaki:1}],['Protect the team first. Winning comes second.',{Akimichi:3,Uzumaki:2}]]},
+{theme:'Conflict',q:'Which kind of opponent frustrates you the most?',a:[
+['Someone unpredictable.',{Hyuga:2,Nara:1}],['Someone who underestimates me.',{Uchiha:3,Inuzuka:2}],['Someone who hurts my teammates to get to me.',{Uzumaki:3,Akimichi:3}],['Someone I cannot understand or read.',{Yamanaka:3,Aburame:1}],['Someone who forces me to waste energy.',{Nara:3,Aburame:2}]]},
+{theme:'Instinct',q:'You have one minute to prepare for an unknown mission. What matters most?',a:[
+['Gathering information.',{Aburame:3,Nara:2}],['Making sure everyone knows their role.',{Yamanaka:3,Hyuga:1}],['Being ready for anything.',{Uzumaki:3,Inuzuka:1}],['Having the strongest possible attack plan.',{Uchiha:3,Inuzuka:2}],['Making sure nobody gets left behind.',{Akimichi:3,Uzumaki:2}]]},
+{theme:'Ambition',q:'What would motivate you to become stronger?',a:[
+['Protecting the people I care about.',{Uzumaki:3,Akimichi:3}],['Proving what I am capable of.',{Uchiha:3,Inuzuka:2}],['Mastering my craft.',{Hyuga:3,Aburame:1}],['Being able to solve harder problems.',{Nara:3,Yamanaka:1}],['Becoming someone others can rely on.',{Akimichi:3,Yamanaka:2}]]},
+{theme:'Pressure',q:'When everything starts going wrong at once, you usually…',a:[
+['Get louder and more decisive.',{Inuzuka:3,Uchiha:1}],['Slow down and analyze.',{Nara:3,Aburame:2}],['Focus on the person who needs me most.',{Akimichi:3,Yamanaka:2}],['Push through it through sheer determination.',{Uzumaki:3,Uchiha:1}],['Return to my training and fundamentals.',{Hyuga:3,Aburame:1}]]},
+{theme:'Identity',q:'Which compliment means the most to you?',a:[
+['“You never give up.”',{Uzumaki:3}],['“You are terrifyingly capable.”',{Uchiha:3}],['“You always know what to do.”',{Nara:3}],['“I trust you.”',{Akimichi:3,Yamanaka:2}],['“You notice everything.”',{Hyuga:2,Aburame:3}]]},
+{theme:'Teamwork',q:'What role do you naturally take in a group?',a:[
+['The strategist.',{Nara:3}],['The protector.',{Akimichi:3,Uzumaki:1}],['The specialist who handles my part quietly.',{Aburame:3,Hyuga:1}],['The motivator and communicator.',{Yamanaka:3,Uzumaki:1}],['The one who pushes everyone forward.',{Inuzuka:3,Uchiha:2}]]},
+{theme:'Risk',q:'A mission has a dangerous shortcut that could save hours. Your call?',a:[
+['Take it. Hesitation can be more dangerous.',{Inuzuka:3,Uchiha:1}],['Only after calculating the odds.',{Nara:3,Aburame:2}],['Avoid it unless the team absolutely needs the time.',{Hyuga:2,Akimichi:2}],['I would take the risk myself and let the others go safely.',{Uzumaki:3,Akimichi:2}],['Find out who benefits most from each option first.',{Yamanaka:2,Nara:1}]]},
+{theme:'Legacy',q:'At the end of your shinobi career, what would you want people to remember?',a:[
+['That I changed what was thought possible.',{Uchiha:3,Uzumaki:1}],['That I protected my people.',{Akimichi:3,Uzumaki:2}],['That I was a true master of my craft.',{Hyuga:3}],['That my decisions saved lives.',{Nara:3,Yamanaka:1}],['That I understood people others overlooked.',{Yamanaka:3,Aburame:1}],['That I never backed down.',{Inuzuka:3,Uchiha:1}]]}
+];
+let i=0,scores={}; Object.keys(clans).forEach(c=>scores[c]=0);
+const home=document.getElementById('home'),quiz=document.getElementById('quiz'),result=document.getElementById('result');
+function render(){const x=questions[i];document.getElementById('qCount').textContent=`Question ${i+1} of ${questions.length}`;document.getElementById('qTheme').textContent=x.theme;document.getElementById('bar').style.width=`${(i/questions.length)*100}%`;document.getElementById('question').textContent=x.q;const box=document.getElementById('answers');box.innerHTML='';x.a.forEach(([text,pts])=>{const b=document.createElement('button');b.className='answer';b.textContent=text;b.onclick=()=>choose(pts);box.appendChild(b)})}
+function choose(pts){Object.entries(pts).forEach(([c,v])=>scores[c]+=v);i++; if(i<questions.length)render();else showResult()}
+function showResult(){quiz.classList.add('hidden');result.classList.remove('hidden');const sorted=Object.entries(scores).sort((a,b)=>b[1]-a[1]);const [winner,top]=sorted[0];const max=questions.length*3;const pct=Math.max(62,Math.min(96,Math.round(68+(top/max)*28)));const c=clans[winner];document.getElementById('clanName').textContent=winner;document.getElementById('sigil').textContent=c.symbol;document.getElementById('matchText').textContent=`${pct}% match`;document.getElementById('desc').textContent=c.desc;document.getElementById('chakra').textContent=c.chakra;document.getElementById('style').textContent=c.style;const traits=document.getElementById('traits');traits.innerHTML='';c.traits.forEach(t=>traits.innerHTML+=`<span class="pill">${t}</span>`);const ranks=document.getElementById('rankings');ranks.innerHTML='';sorted.slice(1,4).forEach(([name,val])=>{const p=Math.max(35,Math.round((val/top)*92));ranks.innerHTML+=`<div class="rank"><span>${name}</span><div class="track"><div class="fill" style="width:${p}%"></div></div><b>${p}%</b></div>`})}
+document.getElementById('startBtn').onclick=()=>{home.classList.add('hidden');quiz.classList.remove('hidden');render()};document.getElementById('howBtn').onclick=()=>document.getElementById('howText').classList.toggle('hidden');document.getElementById('retakeBtn').onclick=()=>{i=0;Object.keys(scores).forEach(c=>scores[c]=0);result.classList.add('hidden');home.classList.remove('hidden')};
+</script>
+</body>
+</html>
