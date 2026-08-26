@@ -43,9 +43,10 @@ The Express server serves `dist/` when `NODE_ENV=production`.
 ## Environment variables
 
 ```text
-CLOUDFLARE_ACCOUNT_ID=...
-CLOUDFLARE_API_TOKEN=...
-CLOUDFLARE_AI_MODEL=@cf/black-forest-labs/flux-2-klein-4b
+CLOUDFLARE_ACCOUNT_ID=your_account_id_here
+CLOUDFLARE_API_TOKEN=your_api_token_here
+CLOUDFLARE_AI_MODEL=@cf/lykon/dreamshaper-8-lcm
+CLOUDFLARE_VISION_MODEL=@cf/meta/llama-3.2-11b-vision-instruct
 PORT=8787
 ```
 
