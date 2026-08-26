@@ -5,7 +5,7 @@ export function shuffle<T>(items:T[],random=Math.random):T[]{
   for(let i=copy.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}
   return copy;
 }
-export function selectQuestions(test:TestDefinition,random=Math.random){return shuffle(test.questions,random).slice(0,Math.min(test.questionCount,test.questions.length));}
+export function selectQuestions(test:TestDefinition,count=test.questionCount,random=Math.random){return shuffle(test.questions,random).slice(0,Math.min(count,test.questions.length));}
 
 export function scoreAnswers(test:TestDefinition,questions:Question[],answers:number[]):TestResult{
   const totals:ScoreMap={};

@@ -1,2 +1,2 @@
 import {useNavigate} from 'react-router-dom';import {Dashboard} from '../components/Dashboard';import {useArchive} from '../store/useArchive';
-export function ArchivePage(){const navigate=useNavigate();const {reset}=useArchive();return <div className="page-enter"><Dashboard onTest={id=>navigate(`/test/${id}`)} onDossier={()=>navigate('/dossier')} onReset={()=>{reset();navigate('/')}}/></div>}
+export function ArchivePage(){const navigate=useNavigate();const {reset}=useArchive();return <div className="page-enter"><Dashboard onTest={id=>navigate(`/test/${id}`)} onDossier={()=>navigate('/dossier')} onGenerator={()=>navigate('/generator')} onReset={()=>{reset();navigate('/')}}/></div>}

@@ -1,7 +1,7 @@
 import {create} from 'zustand';import {persist} from 'zustand/middleware';import type {TestId,TestResult} from '../types/quiz';
-const V7_KEY='shinobiArchiveV7';
+const V7_KEY='shinobiArchiveV8';
 if(typeof window!=='undefined'&&!localStorage.getItem(V7_KEY)){
-  const legacy=localStorage.getItem('shinobiArchiveV6');
+  const legacy=localStorage.getItem('shinobiArchiveV7')||localStorage.getItem('shinobiArchiveV6');
   if(legacy)localStorage.setItem(V7_KEY,legacy);
 }
 interface HistoryItem {testId:TestId;winner:string;date:string}
