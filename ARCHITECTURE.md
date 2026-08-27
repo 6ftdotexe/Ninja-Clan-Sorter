@@ -1,4 +1,4 @@
-# V8 Architecture
+# V9 Architecture
 
 ## Frontend
 
@@ -23,8 +23,8 @@ The six personality tests remain data-driven and independent. The visual generat
 
 ## Persistence
 
-- Personality archive: Zustand persisted to localStorage under `shinobiArchiveV8`.
-- Generated dossier portrait: IndexedDB database `shinobi-v8-media`.
+- Personality archive: Zustand persisted to localStorage under `shinobiArchiveV9`.
+- Generated dossier portrait: IndexedDB database `shinobi-v8-media` retained for V8 compatibility.
 - Uploaded reference selfie: intentionally not persisted.
 
 ## Prompt behavior
