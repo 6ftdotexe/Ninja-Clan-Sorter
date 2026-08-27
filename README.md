@@ -34,3 +34,7 @@ Keep private provider keys server-side in Render environment variables. Only the
 ## Compatibility
 
 V9 uses the local archive key `shinobiArchiveV9` and automatically migrates an existing V8, V7, or V6 archive on first load.
+
+
+## V9 Phase 2
+Adds seven advanced identity trials (Fighting Style, Weapon Affinity, Leadership Style, Rank Potential, Inherited Potential, Shinobi Specialty, Team Role), 13-trial completion progression, archive ranks, badges, and cloud completion mapping.
