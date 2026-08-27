@@ -1,13 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('Supabase environment variables are missing.');
-}
+export const isSupabaseConfigured =
+  Boolean(supabaseUrl) &&
+  Boolean(supabaseAnonKey);
 
 export const supabase = createClient(
-  supabaseUrl || '',
-  supabaseKey || ''
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-key'
 );
