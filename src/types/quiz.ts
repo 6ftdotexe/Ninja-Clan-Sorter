@@ -1,4 +1,4 @@
-export type TestId='clan'|'village'|'mentor'|'rogue'|'chakra'|'summon';
+export type TestId='clan'|'village'|'mentor'|'rogue'|'chakra'|'summon'|'fighting'|'weapon'|'leadership'|'rank'|'inherited'|'specialty'|'teamRole';
 export type TestLength='short'|'medium'|'long';
 export type ScoreMap=Record<string,number>;
 export interface Answer { text:string; scores:ScoreMap }

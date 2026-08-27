@@ -1,431 +1,387 @@
 import 'dotenv/config';
-import express from 'express';
+import express, { type Request } from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 
 type PortraitMode = 'portrait' | 'full-body' | 'action' | 'dossier';
+type GenerationQuality = 'medium' | 'high';
+
+type AuthedRequest = Request & {
+  authUser?: { id: string; email?: string | null };
+};
 
 const app = express();
-app.use(express.json({ limit: '12mb' }));
 
-function getCanvas(mode: PortraitMode) {
-  if (mode === 'action') return { width: 1152, height: 768 };
-  if (mode === 'full-body') return { width: 768, height: 1152 };
-  if (mode === 'dossier') return { width: 768, height: 1152 };
-  return { width: 768, height: 1152 };
+const stripeSecret = process.env.STRIPE_SECRET_KEY?.trim();
+const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
+const stripe = stripeSecret ? new Stripe(stripeSecret) : null;
+
+const supabaseUrl = process.env.SUPABASE_URL?.trim();
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+const admin = supabaseUrl && supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+  : null;
+
+const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL?.trim() || 'gpt-image-2';
+const APP_URL = (process.env.APP_URL?.trim() || 'http://localhost:5173').replace(/\/$/, '');
+
+const CREDIT_PACKS = {
+  single: { credits: 1, cents: 199, label: '1 Shinobi Generation Credit' },
+  triple: { credits: 3, cents: 499, label: '3 Shinobi Generation Credits' },
+  ten: { credits: 10, cents: 1299, label: '10 Shinobi Generation Credits' },
+} as const;
+
+function generationCost(quality: GenerationQuality) {
+  return quality === 'high' ? 2 : 1;
 }
 
-function getErrorMessage(payload: unknown, fallback: string): string {
-  if (typeof payload === 'string' && payload.trim()) return payload;
-
-  if (payload && typeof payload === 'object') {
-    const data = payload as {
-      errors?: Array<{ message?: string }>;
-      error?: string;
-      message?: string;
-      result?: unknown;
-    };
-
-    if (Array.isArray(data.errors) && data.errors[0]?.message) {
-      return data.errors[0].message;
-    }
-    if (typeof data.error === 'string') return data.error;
-    if (typeof data.message === 'string') return data.message;
-
-    if (data.result && typeof data.result === 'object') {
-      const nested = data.result as { error?: string; message?: string };
-      if (typeof nested.error === 'string') return nested.error;
-      if (typeof nested.message === 'string') return nested.message;
-    }
-  }
-
-  return fallback;
+function parseDataUrl(dataUrl: string) {
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) return null;
+  return { mime: match[1], bytes: Buffer.from(match[2], 'base64') };
 }
 
-async function parseCloudflareError(response: Response): Promise<unknown> {
-  const contentType = response.headers.get('content-type') || '';
-  try {
-    return contentType.includes('application/json')
-      ? await response.json()
-      : await response.text();
-  } catch {
-    return null;
-  }
+function openAIImageSize(mode: PortraitMode): '1024x1024' | '1024x1536' | '1536x1024' {
+  if (mode === 'action') return '1536x1024';
+  if (mode === 'portrait') return '1024x1024';
+  return '1024x1536';
 }
 
-function extractVisionText(payload: unknown): string {
-  if (!payload) return '';
-  if (typeof payload === 'string') return payload.trim();
-  if (typeof payload !== 'object') return '';
+function buildOpenAIImagePrompt(profilePrompt: string, mode: PortraitMode) {
+  const composition =
+    mode === 'portrait'
+      ? 'cinematic head-and-shoulders or waist-up portrait'
+      : mode === 'action'
+        ? 'wide cinematic full-body action composition with environmental depth'
+        : mode === 'dossier'
+          ? 'clean vertical full-body character-sheet composition suitable for a dossier'
+          : 'vertical full-body character illustration with the entire outfit visible';
 
-  const data = payload as {
-    response?: unknown;
-    output?: unknown;
-    result?: unknown;
-  };
-
-  // Direct Workers/binding-shaped response.
-  if (typeof data.response === 'string' && data.response.trim()) {
-    return data.response.trim();
-  }
-  if (typeof data.output === 'string' && data.output.trim()) {
-    return data.output.trim();
-  }
-  if (typeof data.result === 'string' && data.result.trim()) {
-    return data.result.trim();
-  }
-
-  // Cloudflare REST API commonly wraps the model output in `result`.
-  if (data.result && typeof data.result === 'object') {
-    const result = data.result as {
-      response?: unknown;
-      output?: unknown;
-      result?: unknown;
-      text?: unknown;
-    };
-
-    if (typeof result.response === 'string' && result.response.trim()) {
-      return result.response.trim();
-    }
-    if (typeof result.output === 'string' && result.output.trim()) {
-      return result.output.trim();
-    }
-    if (typeof result.result === 'string' && result.result.trim()) {
-      return result.result.trim();
-    }
-    if (typeof result.text === 'string' && result.text.trim()) {
-      return result.text.trim();
-    }
-  }
-
-  return '';
-}
-
-function sanitizePromptForCloudflare(input: string): string {
-  const replacements: Array<[RegExp, string]> = [
-    [/\bassault\b/gi, 'front-line'],
-    [/\bprecision offense\b/gi, 'precision technique'],
-    [/\boffense\b/gi, 'technique style'],
-    [/\bbattlefield\b/gi, 'shinobi environment'],
-    [/\bweapon\b/gi, 'shinobi tool'],
-    [/\bweapons\b/gi, 'shinobi tools'],
-    [/\bdangerous\b/gi, 'elite'],
-    [/\bintimidating\b/gi, 'commanding'],
-    [/\baggressive\b/gi, 'assertive'],
-    [/\bviolent\b/gi, 'intense'],
-    [/\blethal\b/gi, 'highly precise'],
-    [/\bdeadly\b/gi, 'highly skilled'],
-    [/\bkill\b/gi, 'defeat'],
-    [/\bkilling\b/gi, 'overcoming opponents'],
-    [/\bdeath\b/gi, 'serious stakes'],
-  ];
-
-  let safe = input;
-  for (const [pattern, replacement] of replacements) {
-    safe = safe.replace(pattern, replacement);
-  }
-  return safe;
-}
-
-function isFlaggedOutputError(payload: unknown): boolean {
-  const message = getErrorMessage(payload, '').toLowerCase();
-  return (
-    message.includes('flagged') ||
-    message.includes('choose another prompt') ||
-    message.includes('safety') ||
-    message.includes('moderation') ||
-    message.includes('policy')
-  );
-}
-
-async function describeReferencePhoto(args: {
-  accountId: string;
-  apiToken: string;
-  visionModel: string;
-  photoDataUrl: string;
-}): Promise<string> {
-  const { accountId, apiToken, visionModel, photoDataUrl } = args;
-
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${visionModel}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: 'system',
-            content:
-              'Describe visible physical appearance for an original anime character-art prompt. Do not identify the person. Be concise and neutral.',
-          },
-          {
-            role: 'user',
-            content: [
-              'Describe only the visible appearance of the adult person in this photo.',
-              'Include approximate adult age range, skin tone, face shape, visible eye color and shape, eyebrows, hair color, length, texture and hairstyle, facial hair if any, visible build/frame, and overall expression.',
-              'Do not identify the person. Do not compare them to celebrities or fictional characters.',
-              'Return one compact paragraph under 90 words.',
-            ].join(' '),
-          },
-        ],
-        image: photoDataUrl,
-        max_tokens: 180,
-        temperature: 0.2,
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const errorPayload = await parseCloudflareError(response);
-    throw new Error(
-      `Vision analysis failed: ${getErrorMessage(
-        errorPayload,
-        'Cloudflare vision request failed.'
-      )}`
-    );
-  }
-
-  const payload = await response.json().catch(() => null);
-
-  // Keep this log while testing. It contains the model response, not your API token.
-  console.log('VISION RAW RESPONSE:', JSON.stringify(payload, null, 2));
-
-  const description = extractVisionText(payload);
-  if (!description) {
-    throw new Error(
-      'Vision model returned no usable appearance description. Check the server console for VISION RAW RESPONSE.'
-    );
-  }
-
-  return description;
-}
-
-function buildImagePrompt(
-  appearanceDescription: string,
-  shinobiPrompt: string
-): string {
   return `
-Create polished high-detail 2D anime character concept art of an ORIGINAL adult shinobi.
+Transform the adult person in the supplied reference photo into an ORIGINAL anime shinobi character.
 
-HUMAN APPEARANCE BASIS
-${appearanceDescription}
+IDENTITY PRESERVATION — HIGHEST PRIORITY
+Preserve the recognizable identity of the person in the reference image: facial structure, skin tone, eye shape, nose, mouth, jawline, facial hair when present, hairstyle, hair texture, and overall age/presentation. The output should clearly look like the same adult person, stylized as anime rather than replaced by a different person.
 
-SHINOBI IDENTITY
-${shinobiPrompt}
+COMPOSITION
+${composition}.
 
-VISUAL LANGUAGE
-Make the result unmistakably a hidden-ninja-village shonen anime character while remaining original: layered shinobi clothing, practical tactical vest or light armor when appropriate, cloth wraps, arm guards, utility pouches, scroll details, open-toed shinobi footwear when visible, and an original forehead protector with an invented emblem. Use a strong readable silhouette, expressive anime eyes, cel-shaded forms, crisp linework, cinematic anime lighting and detailed fabric folds.
+SHINOBI PROFILE
+${profilePrompt}
 
-DYNAMIC PROFILE ADAPTATION
-Use ONLY the profile supplied above. Let its clan/bloodline influence motifs and inherited features. Let its village influence terrain, architecture, climate, palette and clothing practicality. Show only the listed chakra nature or natures as controlled aura/effects. Include a summoning companion only if one is present in the profile. If an inherited eye trait is present, create a subtle original iris design rather than a recognizable canon pattern. Use mentor/shadow results only as personality, posture and composure influences—not physical resemblance.
+VISUAL DIRECTION
+Create premium modern shonen ninja anime key art: crisp expressive linework, detailed cel shading, cinematic lighting, realistic anime anatomy, layered practical shinobi clothing, wraps, tactical fabric, arm guards, utility pouches, scroll/equipment details, and an original forehead protector or village emblem when appropriate. Make the village, terrain, climate, chakra effects, summon, rank presence, and inherited traits dynamically match ONLY the supplied profile.
 
-ORIGINALITY
-Do not copy or closely recreate any named anime character, recognizable canon costume, insignia, hairstyle, pose, eye pattern or signature item. No franchise logos or text.
+CHAKRA AND SUMMONING
+Show only chakra natures actually listed in the profile. Keep elemental effects controlled and readable. Include a summoning companion only when the profile includes one. Keep the human character as the primary focal point.
+
+ORIGINAL CHARACTER REQUIREMENT
+Do not copy or closely recreate any named canon anime character, recognizable canon costume, exact clan symbol, exact eye pattern, signature hairstyle, signature pose, or franchise logo. If an inherited eye ability is relevant, invent a new iris design rather than reproducing a recognizable canon design.
 
 CONTENT
-Adult character. Non-graphic fantasy action atmosphere. No blood, gore, wounds, corpses, torture or graphic violence. Any shinobi tools should be sheathed, holstered or secondary to the character design.
+Adult character. Non-graphic fantasy action. No blood, gore, wounds, corpses, torture, graphic injury, or horror. Shinobi tools may be present as neutral costume/equipment details. No text, watermark, UI, or logos.
 
-OUTPUT
-Professional anime key art, coherent anatomy, clean hands, detailed face, sharp eyes, no text, no watermark.
+QUALITY TARGET
+Highly polished character illustration, detailed face and eyes, coherent hands and anatomy, readable silhouette, cinematic hidden-village worldbuilding, and strong resemblance to the reference person.
 `.trim();
 }
 
-async function parseCloudflareImageResponse(
-  response: Response
-): Promise<{ imageDataUrl: string } | null> {
-  const contentType = response.headers.get('content-type') || '';
+async function requireUser(req: AuthedRequest, res: express.Response, next: express.NextFunction) {
+  if (!admin) {
+    return res.status(503).json({ error: 'Server Supabase credentials are not configured.' });
+  }
+  const auth = req.headers.authorization;
+  const token = auth?.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  if (!token) return res.status(401).json({ error: 'Sign in to continue.' });
 
-  if (
-    contentType.startsWith('image/') ||
-    contentType.includes('application/octet-stream')
-  ) {
-    const bytes = Buffer.from(await response.arrayBuffer());
-    const mime = contentType.startsWith('image/') ? contentType : 'image/png';
-    return { imageDataUrl: `data:${mime};base64,${bytes.toString('base64')}` };
+  const { data, error } = await admin.auth.getUser(token);
+  if (error || !data.user) return res.status(401).json({ error: 'Your session is invalid or expired.' });
+  req.authUser = { id: data.user.id, email: data.user.email };
+  next();
+}
+
+async function getCredits(userId: string) {
+  if (!admin) return 0;
+  const { data, error } = await admin
+    .from('generation_wallets')
+    .select('credits')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return Number(data?.credits || 0);
+}
+
+async function reserveCredits(userId: string, amount: number) {
+  if (!admin) throw new Error('Supabase admin client is unavailable.');
+  const { data, error } = await admin.rpc('reserve_generation_credits', {
+    p_user_id: userId,
+    p_amount: amount,
+  });
+  if (error) throw error;
+  return Number(data);
+}
+
+async function grantCredits(userId: string, amount: number) {
+  if (!admin) throw new Error('Supabase admin client is unavailable.');
+  const { data, error } = await admin.rpc('grant_generation_credits', {
+    p_user_id: userId,
+    p_amount: amount,
+  });
+  if (error) throw error;
+  return Number(data);
+}
+
+// Stripe requires the raw request body for webhook signature verification.
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe || !stripeWebhookSecret || !admin) {
+    return res.status(503).send('Stripe webhook is not configured.');
   }
 
-  const payload = (await response.json().catch(() => null)) as
-    | {
-        image?: string;
-        mime_type?: string;
-        result?: unknown;
+  const signature = req.headers['stripe-signature'];
+  if (typeof signature !== 'string') return res.status(400).send('Missing Stripe signature.');
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, signature, stripeWebhookSecret);
+  } catch (error) {
+    console.error('Stripe webhook signature error:', error);
+    return res.status(400).send('Invalid webhook signature.');
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const userId = session.metadata?.user_id;
+    const credits = Number(session.metadata?.credits || 0);
+
+    if (userId && credits > 0 && session.payment_status === 'paid') {
+      const { error: insertError } = await admin.from('generation_payments').insert({
+        user_id: userId,
+        stripe_session_id: session.id,
+        stripe_payment_intent_id:
+          typeof session.payment_intent === 'string' ? session.payment_intent : null,
+        credits,
+        amount_cents: session.amount_total || 0,
+        currency: session.currency || 'usd',
+        status: 'paid',
+      });
+
+      if (!insertError) {
+        await grantCredits(userId, credits);
+        console.log(`Granted ${credits} generation credit(s) to ${userId}.`);
+      } else if (insertError.code !== '23505') {
+        console.error('Could not record completed checkout:', insertError);
+        return res.status(500).send('Could not record payment.');
       }
-    | null;
-
-  if (!payload) return null;
-
-  if (typeof payload.image === 'string') {
-    return {
-      imageDataUrl: `data:${payload.mime_type || 'image/png'};base64,${payload.image}`,
-    };
-  }
-
-  if (payload.result && typeof payload.result === 'object') {
-    const result = payload.result as {
-      image?: string;
-      mime_type?: string;
-    };
-    if (typeof result.image === 'string') {
-      return {
-        imageDataUrl: `data:${result.mime_type || 'image/png'};base64,${result.image}`,
-      };
     }
   }
 
-  return null;
-}
+  return res.json({ received: true });
+});
+
+app.use(express.json({ limit: '14mb' }));
 
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
-    service: 'shinobi-v9-image-generator',
-    provider: 'cloudflare-workers-ai',
-    visionModel:
-      process.env.CLOUDFLARE_VISION_MODEL ||
-      '@cf/meta/llama-3.2-11b-vision-instruct',
-    imageModel:
-      process.env.CLOUDFLARE_AI_MODEL || '@cf/lykon/dreamshaper-8-lcm',
+    service: 'shinobi-v9-phase3',
+    imageProvider: 'openai',
+    imageModel: OPENAI_IMAGE_MODEL,
+    paymentsConfigured: Boolean(stripe && stripeWebhookSecret),
+    accountsConfigured: Boolean(admin),
   });
 });
 
-app.post('/api/generate-shinobi', async (req, res) => {
+app.get('/api/credits', requireUser, async (req: AuthedRequest, res) => {
   try {
-    const { photoDataUrl, prompt, mode, quality } = req.body ?? {};
-
-    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-    const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-    const visionModel =
-      process.env.CLOUDFLARE_VISION_MODEL ||
-      '@cf/meta/llama-3.2-11b-vision-instruct';
-    const imageModel =
-      process.env.CLOUDFLARE_AI_MODEL || '@cf/lykon/dreamshaper-8-lcm';
-
-    if (!accountId || !apiToken) {
-      return res.status(503).json({
-        error:
-          'Missing CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN in .env.',
-      });
-    }
-
-    if (
-      typeof photoDataUrl !== 'string' ||
-      !photoDataUrl.startsWith('data:image/')
-    ) {
-      return res.status(400).json({ error: 'A valid reference photo is required.' });
-    }
-
-    if (photoDataUrl.length > 12_000_000) {
-      return res.status(413).json({ error: 'Reference image is too large.' });
-    }
-
-    if (
-      typeof prompt !== 'string' ||
-      prompt.length < 40 ||
-      prompt.length > 7000
-    ) {
-      return res.status(400).json({ error: 'Invalid generation prompt.' });
-    }
-
-    const { width, height } = getCanvas(
-      (mode as PortraitMode) || 'portrait'
-    );
-
-    console.log(`Analyzing reference photo with ${visionModel}...`);
-    const appearanceDescription = await describeReferencePhoto({
-      accountId,
-      apiToken,
-      visionModel,
-      photoDataUrl,
-    });
-    console.log('APPEARANCE DESCRIPTION:', appearanceDescription);
-
-    const runGeneration = async (profilePrompt: string) => {
-      const finalPrompt = buildImagePrompt(appearanceDescription, profilePrompt);
-      const response = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${imageModel}`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${apiToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: finalPrompt,
-            width,
-            height,
-            num_steps: quality === 'medium' ? 16 : 20,
-            guidance: quality === 'medium' ? 6.5 : 7.5,
-            negative_prompt:
-              'photograph, photorealistic, 3d render, blurry, low detail, distorted anatomy, extra fingers, extra limbs, duplicate face, malformed eyes, cropped face, text, logo, watermark, blood, gore, wound, horror',
-            seed: Math.floor(Math.random() * 1_000_000_000),
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorPayload = await parseCloudflareError(response);
-        return {
-          ok: false as const,
-          status: response.status,
-          errorPayload,
-          errorMessage: getErrorMessage(
-            errorPayload,
-            'Cloudflare image generation failed.'
-          ),
-        };
-      }
-
-      const parsed = await parseCloudflareImageResponse(response);
-      if (!parsed) {
-        return {
-          ok: false as const,
-          status: 502,
-          errorPayload: null,
-          errorMessage:
-            'Cloudflare completed the image request but returned no usable image.',
-        };
-      }
-
-      return {
-        ok: true as const,
-        body: {
-          imageDataUrl: parsed.imageDataUrl,
-          requestId: response.headers.get('cf-ray') || undefined,
-          provider: 'cloudflare-workers-ai',
-          model: imageModel,
-          appearanceDescription,
-        },
-      };
-    };
-
-    console.log(`Generating with ${imageModel}...`);
-    console.log(`Mode: ${mode || 'portrait'} | ${width}x${height}`);
-
-    const first = await runGeneration(prompt);
-    if (first.ok) {
-      return res.json({ ...first.body, moderatedRetry: false });
-    }
-
-    if (isFlaggedOutputError(first.errorPayload)) {
-      console.warn('Generation flagged. Retrying with safer profile wording...');
-      const retry = await runGeneration(sanitizePromptForCloudflare(prompt));
-      if (retry.ok) {
-        return res.json({ ...retry.body, moderatedRetry: true });
-      }
-      return res.status(retry.status).json({
-        error: retry.errorMessage,
-        safetyRetryAttempted: true,
-      });
-    }
-
-    return res.status(first.status).json({ error: first.errorMessage });
+    const credits = await getCredits(req.authUser!.id);
+    return res.json({ credits });
   } catch (error) {
-    console.error('Unhandled generation error:', error);
+    console.error('Credit lookup failed:', error);
+    return res.status(500).json({ error: 'Could not load generation credits.' });
+  }
+});
+
+app.get('/api/credit-packs', (_req, res) => {
+  return res.json(
+    Object.entries(CREDIT_PACKS).map(([id, pack]) => ({ id, ...pack }))
+  );
+});
+
+app.post('/api/create-checkout', requireUser, async (req: AuthedRequest, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Stripe is not configured yet.' });
+
+  const packId = String(req.body?.packId || '') as keyof typeof CREDIT_PACKS;
+  const pack = CREDIT_PACKS[packId];
+  if (!pack) return res.status(400).json({ error: 'Unknown credit pack.' });
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer_email: req.authUser?.email || undefined,
+      client_reference_id: req.authUser!.id,
+      success_url: `${APP_URL}/generator?purchase=success`,
+      cancel_url: `${APP_URL}/generator?purchase=cancelled`,
+      allow_promotion_codes: true,
+      metadata: {
+        user_id: req.authUser!.id,
+        credits: String(pack.credits),
+        pack_id: packId,
+      },
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: 'usd',
+            unit_amount: pack.cents,
+            product_data: {
+              name: pack.label,
+              description: 'Generation credits for Shinobi Identity Archive.',
+            },
+          },
+        },
+      ],
+    });
+
+    if (!session.url) return res.status(502).json({ error: 'Stripe did not return a checkout URL.' });
+    return res.json({ url: session.url });
+  } catch (error) {
+    console.error('Stripe checkout creation failed:', error);
+    return res.status(500).json({ error: 'Could not start checkout.' });
+  }
+});
+
+app.post('/api/generate-shinobi', requireUser, async (req: AuthedRequest, res) => {
+  const openAiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!openAiKey) return res.status(503).json({ error: 'OPENAI_API_KEY is not configured.' });
+  if (!admin) return res.status(503).json({ error: 'Supabase server credentials are not configured.' });
+
+  const { photoDataUrl, prompt, mode = 'full-body', quality = 'medium' } = req.body ?? {};
+  const portraitMode = mode as PortraitMode;
+  const generationQuality: GenerationQuality = quality === 'high' ? 'high' : 'medium';
+  const cost = generationCost(generationQuality);
+
+  if (typeof photoDataUrl !== 'string' || !photoDataUrl.startsWith('data:image/')) {
+    return res.status(400).json({ error: 'A valid reference photo is required.' });
+  }
+  if (photoDataUrl.length > 14_000_000) {
+    return res.status(413).json({ error: 'Reference image is too large.' });
+  }
+  if (typeof prompt !== 'string' || prompt.length < 40 || prompt.length > 9000) {
+    return res.status(400).json({ error: 'Invalid generation prompt.' });
+  }
+
+  const parsed = parseDataUrl(photoDataUrl);
+  if (!parsed) return res.status(400).json({ error: 'Reference photo encoding is invalid.' });
+
+  let generationId: string | null = null;
+  let creditsReserved = false;
+
+  try {
+    const remaining = await reserveCredits(req.authUser!.id, cost);
+    if (remaining < 0) {
+      return res.status(402).json({
+        error: `You need ${cost} generation credit${cost === 1 ? '' : 's'} for this render.`,
+        code: 'INSUFFICIENT_CREDITS',
+        requiredCredits: cost,
+        credits: await getCredits(req.authUser!.id),
+      });
+    }
+    creditsReserved = true;
+
+    const { data: generation, error: generationInsertError } = await admin
+      .from('generations')
+      .insert({
+        user_id: req.authUser!.id,
+        status: 'processing',
+        credits_used: cost,
+        model: OPENAI_IMAGE_MODEL,
+        mode: portraitMode,
+        quality: generationQuality,
+      })
+      .select('id')
+      .single();
+
+    if (generationInsertError) throw generationInsertError;
+    generationId = generation.id;
+
+    const form = new FormData();
+    form.append('model', OPENAI_IMAGE_MODEL);
+    form.append('image', new Blob([new Uint8Array(parsed.bytes)], { type: parsed.mime }), `reference.${parsed.mime.includes('png') ? 'png' : 'jpg'}`);
+    form.append('prompt', buildOpenAIImagePrompt(prompt, portraitMode));
+    form.append('size', openAIImageSize(portraitMode));
+    form.append('quality', generationQuality);
+    form.append('input_fidelity', 'high');
+
+    const response = await fetch('https://api.openai.com/v1/images/edits', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openAiKey}` },
+      body: form,
+    });
+
+    const payload = (await response.json().catch(() => null)) as
+      | { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } }
+      | null;
+
+    if (!response.ok) {
+      throw new Error(payload?.error?.message || `OpenAI image generation failed (${response.status}).`);
+    }
+
+    const item = payload?.data?.[0];
+    let imageDataUrl = '';
+    if (item?.b64_json) {
+      imageDataUrl = `data:image/png;base64,${item.b64_json}`;
+    } else if (item?.url) {
+      const imageResponse = await fetch(item.url);
+      if (!imageResponse.ok) throw new Error('OpenAI generated the image but it could not be downloaded.');
+      const bytes = Buffer.from(await imageResponse.arrayBuffer());
+      const mime = imageResponse.headers.get('content-type') || 'image/png';
+      imageDataUrl = `data:${mime};base64,${bytes.toString('base64')}`;
+    }
+
+    if (!imageDataUrl) throw new Error('OpenAI returned no generated image.');
+
+    await admin
+      .from('generations')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', generationId);
+
+    return res.json({
+      imageDataUrl,
+      provider: 'openai',
+      model: OPENAI_IMAGE_MODEL,
+      creditsUsed: cost,
+      creditsRemaining: remaining,
+      generationId,
+    });
+  } catch (error) {
+    console.error('OpenAI generation failed:', error);
+
+    if (creditsReserved) {
+      try {
+        await grantCredits(req.authUser!.id, cost);
+      } catch (refundError) {
+        console.error('CRITICAL: generation credit refund failed:', refundError);
+      }
+    }
+
+    if (generationId) {
+      await admin
+        .from('generations')
+        .update({
+          status: 'failed',
+          error_message: error instanceof Error ? error.message.slice(0, 500) : 'Unknown generation failure',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', generationId);
+    }
+
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Image generation failed.',
+      creditsRefunded: creditsReserved,
     });
   }
 });
@@ -440,16 +396,7 @@ if (process.env.NODE_ENV === 'production') {
 
 const port = Number(process.env.PORT || 8787);
 app.listen(port, () => {
-  console.log(`Shinobi V9 server listening on http://localhost:${port}`);
-  console.log(
-    `Vision model: ${
-      process.env.CLOUDFLARE_VISION_MODEL ||
-      '@cf/meta/llama-3.2-11b-vision-instruct'
-    }`
-  );
-  console.log(
-    `Image model: ${
-      process.env.CLOUDFLARE_AI_MODEL || '@cf/lykon/dreamshaper-8-lcm'
-    }`
-  );
+  console.log(`Shinobi V9 Phase 3 listening on http://localhost:${port}`);
+  console.log(`Image model: ${OPENAI_IMAGE_MODEL}`);
+  console.log(`Stripe configured: ${Boolean(stripe && stripeWebhookSecret)}`);
 });

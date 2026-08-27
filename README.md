@@ -38,3 +38,7 @@ V9 uses the local archive key `shinobiArchiveV9` and automatically migrates an e
 
 ## V9 Phase 2
 Adds seven advanced identity trials (Fighting Style, Weapon Affinity, Leadership Style, Rank Potential, Inherited Potential, Shinobi Specialty, Team Role), 13-trial completion progression, archive ranks, badges, and cloud completion mapping.
+
+
+## V9 Phase 3
+Paid OpenAI image generation, Stripe credit packs, atomic credit reservations/refunds, and account-gated generation. See `PHASE3_SETUP.md`.
