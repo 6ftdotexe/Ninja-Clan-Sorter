@@ -1,0 +1,18 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { tests } from '../data/tests';
+import { getWorldStats, listPublicCharacters, type WorldStatItem, type WorldStats } from '../services/publicProfileService';
+import type { ShinobiCharacter } from '../services/characterService';
+
+const initialStats: WorldStats = { public_count:0, complete_count:0, clans:[], villages:[], chakra:[], ranks:[], summons:[] };
+function label(testId: keyof typeof tests, value: string | null) { return value ? tests[testId]?.outcomes[value]?.label || value : 'Unknown'; }
+function StatList({title,items}:{title:string;items:WorldStatItem[]}) { const max=Math.max(1,...items.map(i=>i.count)); return <div className="world-stat"><h3>{title}</h3>{items.length ? items.slice(0,6).map(item=><div className="world-row" key={item.label}><div><strong>{item.label}</strong><span>{item.count}</span></div><div className="world-bar"><i style={{width:`${Math.max(7,item.count/max*100)}%`}} /></div></div>) : <p className="muted">No public data yet.</p>}</div>; }
+
+export function DiscoverPage(){
+  const [characters,setCharacters]=useState<ShinobiCharacter[]>([]);
+  const [stats,setStats]=useState<WorldStats>(initialStats);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState('');
+  useEffect(()=>{Promise.all([listPublicCharacters(12),getWorldStats()]).then(([c,s])=>{setCharacters(c);setStats(s)}).catch(e=>setError(e instanceof Error?e.message:'Could not load the Shinobi World.')).finally(()=>setLoading(false))},[]);
+  return <div className="screen discover-page page-enter"><div className="discover-head"><div><span className="eyebrow">V9 · PHASE 4 · SHINOBI WORLD</span><h2>Discover the Archive</h2><p>Explore public identities and see how the community is distributed across clans, villages, chakra natures, ranks, and summons.</p></div><Link className="btn primary" to="/archive">Build Your Identity</Link></div>{error&&<div className="generator-error">{error}</div>}<div className="world-summary"><div><strong>{loading?'—':stats.public_count}</strong><span>PUBLIC SHINOBI</span></div><div><strong>{loading?'—':stats.complete_count}</strong><span>COMPLETE IDENTITIES</span></div><div><strong>{loading?'—':stats.clans.length}</strong><span>CLANS REPRESENTED</span></div><div><strong>{loading?'—':stats.villages.length}</strong><span>VILLAGES REPRESENTED</span></div></div><section className="world-section"><div className="section-title"><div><span className="eyebrow">COMMUNITY DATA</span><h3>Shinobi World Statistics</h3></div></div><div className="world-stat-grid"><StatList title="Top Clans" items={stats.clans}/><StatList title="Top Villages" items={stats.villages}/><StatList title="Primary Chakra" items={stats.chakra}/><StatList title="Rank Distribution" items={stats.ranks}/><StatList title="Summoning Contracts" items={stats.summons}/></div></section><section className="world-section"><div className="section-title"><div><span className="eyebrow">LATEST PUBLIC ARCHIVES</span><h3>Meet the Shinobi</h3></div><span>{characters.length}</span></div><div className="public-card-grid">{characters.map(c=><Link to={`/shinobi/${c.public_slug}`} className="public-card" key={c.id}><div className="public-card-art">{c.portrait_url?<img src={c.portrait_url} alt=""/>:<span>忍</span>}<em>{c.completion_percent}%</em></div><div><small>{label('village',c.village)}</small><h3>{c.name}</h3><p>{label('clan',c.clan)} · {label('rank',c.rank)}</p></div></Link>)}{!loading&&characters.length===0&&<div className="empty-cloud"><strong>No public shinobi yet.</strong><span>Publish one from your account to become the first.</span></div>}</div></section></div>;
+}

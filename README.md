@@ -42,3 +42,8 @@ Adds seven advanced identity trials (Fighting Style, Weapon Affinity, Leadership
 
 ## V9 Phase 3
 Paid OpenAI image generation, Stripe credit packs, atomic credit reservations/refunds, and account-gated generation. See `PHASE3_SETUP.md`.
+
+
+## V9 Phase 4
+
+Phase 4 adds the Shinobi World: publishable character profiles, share links, active characters, a Discover page, and aggregate public clan/village/chakra/rank/summon statistics. Run `supabase/v9-phase4.sql` after the earlier V9 migrations.
