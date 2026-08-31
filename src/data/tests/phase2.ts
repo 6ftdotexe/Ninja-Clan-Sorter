@@ -2,7 +2,7 @@ import type { Answer, Outcome, Question, TestDefinition, TestId } from '../../ty
 
 const answer = (text: string, scores: Record<string, number>): Answer => ({ text, scores });
 const question = (id: string, theme: string, prompt: string, answers: Answer[]): Question => ({ id, theme, prompt, answers });
-const outcome = (id: string, label: string, symbol: string, description: string): Outcome => ({ id, label, symbol, description });
+const outcome = (id: string, label: string, symbol: string, description: string, rarity?: number): Outcome => ({ id, label, symbol, description, ...(rarity ? { rarity } : {}) });
 
 function makeTest(
   id: TestId,
@@ -264,75 +264,77 @@ export const rankTest = makeTest(
   'Rank Potential',
   'Rank',
   '★',
-  'Estimate the level of responsibility your answers point toward.',
+  'Estimate the highest level of responsibility, judgment, and influence your answers point toward.',
   [
     outcome('genin', 'Genin Potential', '下', 'Your profile favors learning through direct experience while core instincts are still developing.'),
     outcome('chunin', 'Chūnin Potential', '中', 'You show the reliability and judgment expected from a dependable field operator.'),
     outcome('special', 'Special Jōnin Potential', '特', 'You show unusually strong specialist ability even if you are not built around broad command.'),
     outcome('jonin', 'Jōnin Potential', '上', 'You combine independence, tactical judgment, versatility, and responsibility at a high level.'),
     outcome('elite', 'Elite Jōnin Potential', '精', 'Your profile points toward exceptional field capability and the ability to solve high-risk problems independently.'),
-    outcome('kage', 'Kage Candidate', '影', 'You combine elite ability with strategic responsibility, leadership, and village-scale judgment.'),
+    outcome('kage', 'Kage Candidate', '影', 'You have the elite field ability and broad responsibility expected from someone who could eventually enter village-level leadership.'),
+    outcome('kagePotential', 'Kage Potential', '冠', 'Your answers consistently show village-scale judgment, leadership, accountability, adaptability, and the ability to make decisions that affect more than one squad.', 1.06),
+    outcome('legendary', 'Legendary Potential', '神', 'An exceptionally rare profile: elite capability combined with extraordinary judgment, responsibility, influence, resilience, and the ability to reshape how an entire village operates.', 1.20),
   ],
   [
     question('rank-1', 'Responsibility', 'A mission begins failing for reasons outside your assignment. What do you do?', [
       answer('Focus on my assigned role and ask for direction before changing it.', { genin: 5, chunin: 1 }),
-      answer('Adjust my part and communicate the change clearly to the squad.', { chunin: 5 }),
-      answer('Take ownership of the immediate problem if it matches my expertise.', { special: 5, jonin: 1 }),
-      answer('Reassess the entire mission and coordinate a new direction.', { jonin: 4, elite: 2, kage: 1 }),
+      answer('Adjust my part and communicate the change clearly to the squad.', { chunin: 5, jonin: 1 }),
+      answer('Take ownership of the immediate problem if it matches my expertise.', { special: 5, jonin: 2, elite: 1 }),
+      answer('Reassess the whole mission, coordinate a new direction, and own the consequences.', { jonin: 3, elite: 3, kage: 3, kagePotential: 4, legendary: 2 }),
     ]),
     question('rank-2', 'Judgment', 'You receive an order that no longer fits the situation. What is your instinct?', [
       answer('Follow it unless someone senior changes the instruction.', { genin: 5 }),
-      answer('Use reasonable judgment within the intent of the order.', { chunin: 5 }),
-      answer('Ignore the original method if my specialty gives me a clearly better solution.', { special: 4, jonin: 2 }),
-      answer('Make the best decision available and be ready to fully own the consequences.', { jonin: 4, elite: 3, kage: 2 }),
+      answer('Use reasonable judgment within the intent of the order.', { chunin: 5, jonin: 1 }),
+      answer('Change the method if my specialty gives me a clearly better solution.', { special: 4, jonin: 3, elite: 1 }),
+      answer('Choose the best available course, explain why, and accept full responsibility for the outcome.', { jonin: 3, elite: 3, kage: 3, kagePotential: 4, legendary: 3 }),
     ]),
     question('rank-3', 'Scope', 'Which responsibility sounds most natural?', [
       answer('Execute my role well and keep learning.', { genin: 5 }),
-      answer('Coordinate a small team through a defined objective.', { chunin: 5 }),
-      answer('Be the expert called when one difficult problem needs solving.', { special: 5 }),
-      answer('Lead complex missions where the plan will probably change several times.', { jonin: 4, elite: 2 }),
+      answer('Coordinate a small team through a defined objective.', { chunin: 5, jonin: 1 }),
+      answer('Be the expert called when one difficult problem needs solving.', { special: 5, elite: 2 }),
+      answer('Lead complex missions whose decisions can affect multiple teams or the wider village.', { jonin: 2, elite: 3, kage: 4, kagePotential: 4, legendary: 2 }),
     ]),
     question('rank-4', 'Uncertainty', 'How much uncertainty can you comfortably own?', [
       answer('I perform best with clear expectations and feedback.', { genin: 5 }),
       answer('I can handle normal field uncertainty if the objective is clear.', { chunin: 5 }),
-      answer('A lot, as long as the problem is inside my strongest discipline.', { special: 5 }),
-      answer('I am comfortable making high-impact decisions with incomplete information.', { elite: 4, jonin: 3, kage: 2 }),
+      answer('A lot, as long as the problem is inside my strongest discipline.', { special: 5, elite: 2 }),
+      answer('I can make high-impact decisions with incomplete information while accounting for long-term consequences.', { jonin: 2, elite: 3, kage: 3, kagePotential: 5, legendary: 3 }),
     ]),
     question('rank-5', 'Team', 'A less-experienced teammate is struggling during a mission. What do you do?', [
       answer('Help with the immediate task and look to the leader for the larger adjustment.', { genin: 4, chunin: 2 }),
-      answer('Coach them enough to keep the squad functioning.', { chunin: 5 }),
-      answer('Cover the technical weakness if it falls inside my specialty.', { special: 5 }),
-      answer('Adjust assignments so they can succeed without compromising the mission.', { jonin: 5, elite: 1 }),
+      answer('Coach them enough to keep the squad functioning.', { chunin: 5, jonin: 1 }),
+      answer('Cover the technical weakness if it falls inside my specialty.', { special: 5, elite: 2 }),
+      answer('Restructure the plan so they can succeed, preserve the mission, and learn from the situation afterward.', { jonin: 3, elite: 3, kage: 3, kagePotential: 4, legendary: 2 }),
     ]),
     question('rank-6', 'Complexity', 'Which mission would you rather receive?', [
       answer('A clear objective where I can prove fundamentals.', { genin: 5 }),
-      answer('A multi-step field mission with a small team.', { chunin: 5 }),
-      answer('A difficult assignment chosen specifically for my rare skill set.', { special: 5 }),
-      answer('A high-risk mission where success depends on independent judgment.', { elite: 4, jonin: 3 }),
+      answer('A multi-step field mission with a small team.', { chunin: 5, jonin: 1 }),
+      answer('A difficult assignment chosen specifically for my rare skill set.', { special: 5, elite: 3 }),
+      answer('A mission with incomplete intelligence where several squads depend on my judgment.', { jonin: 2, elite: 3, kage: 3, kagePotential: 5, legendary: 3 }),
     ]),
     question('rank-7', 'Leadership', 'How naturally do you take responsibility for other people’s decisions?', [
       answer('I would rather master my own decisions first.', { genin: 5, special: 1 }),
-      answer('I can supervise a small group when roles are clear.', { chunin: 5 }),
-      answer('I prefer expert responsibility over broad command.', { special: 5 }),
-      answer('I am comfortable owning both the plan and the people executing it.', { jonin: 4, elite: 2, kage: 3 }),
+      answer('I can supervise a small group when roles are clear.', { chunin: 5, jonin: 1 }),
+      answer('I prefer expert responsibility over broad command.', { special: 5, elite: 2 }),
+      answer('I am comfortable owning the strategy, the people executing it, and the consequences beyond the mission itself.', { jonin: 2, elite: 3, kage: 4, kagePotential: 5, legendary: 4 }),
     ]),
     question('rank-8', 'Failure', 'A major mission fails under your command. What happens next?', [
       answer('I need senior guidance to understand what I missed.', { genin: 5 }),
-      answer('I review my decisions and improve the process for the next mission.', { chunin: 5 }),
-      answer('I identify whether my expertise failed or was used incorrectly.', { special: 5 }),
-      answer('I take responsibility, protect the team from blame-shifting, and rebuild the strategy.', { jonin: 3, elite: 4, kage: 3 }),
+      answer('I review my decisions and improve the process for the next mission.', { chunin: 5, jonin: 1 }),
+      answer('I identify whether my expertise failed or was used incorrectly.', { special: 5, elite: 2 }),
+      answer('I take responsibility, protect the team from blame-shifting, rebuild the strategy, and change the system that allowed the failure.', { jonin: 2, elite: 2, kage: 3, kagePotential: 3, legendary: 9 }),
     ]),
     question('rank-9', 'Village', 'What kind of impact sounds most satisfying?', [
       answer('Becoming clearly stronger and more capable than I am now.', { genin: 5 }),
-      answer('Being someone others can reliably put in charge of a squad.', { chunin: 5 }),
-      answer('Becoming one of the village’s best people in a specific discipline.', { special: 5, elite: 1 }),
-      answer('Shaping how the village handles its hardest problems.', { elite: 3, kage: 5, jonin: 1 }),
+      answer('Being someone others can reliably put in charge of a squad.', { chunin: 5, jonin: 2 }),
+      answer('Becoming one of the village’s best people in a specific discipline.', { special: 5, elite: 3 }),
+      answer('Improving how the entire village responds to its hardest problems and preparing the next generation to surpass me.', { elite: 2, kage: 3, kagePotential: 3, legendary: 10 }),
     ]),
-    question('rank-10', 'Peak', 'At your peak, which description fits best?', [
+    question('rank-10', 'Peak', 'At your absolute peak, which description fits best?', [
       answer('A talented shinobi with huge room to grow.', { genin: 5 }),
-      answer('A trusted squad leader who consistently gets people home.', { chunin: 5, jonin: 1 }),
-      answer('A specialist whose name is known across villages for one discipline.', { special: 5, elite: 2 }),
-      answer('A top-level operative trusted with missions that can affect the whole village.', { elite: 4, jonin: 2, kage: 4 }),
+      answer('A trusted squad leader who consistently gets people home.', { chunin: 5, jonin: 2 }),
+      answer('A specialist whose name is known across villages for one discipline.', { special: 5, elite: 4 }),
+      answer('A leader whose judgment can carry a village through crises and whose influence changes the generation that follows.', { elite: 2, kage: 3, kagePotential: 3, legendary: 11 }),
     ]),
   ],
 );

@@ -49,4 +49,21 @@ describe('V9 quiz data contract', () => {
       expect(test.lengths.medium).toBeLessThanOrEqual(test.lengths.long);
     }
   });
+
+  it('allows Rank Potential to reach Kage and Legendary outcomes', () => {
+    const rank = tests.rank;
+    expect(rank.outcomes.kagePotential?.label).toBe('Kage Potential');
+    expect(rank.outcomes.legendary?.label).toBe('Legendary Potential');
+
+    const highTierCoverage = rank.questions.filter((question) =>
+      question.answers.some((answer) => (answer.scores.kagePotential || 0) > 0),
+    ).length;
+    const legendaryCoverage = rank.questions.filter((question) =>
+      question.answers.some((answer) => (answer.scores.legendary || 0) > 0),
+    ).length;
+
+    expect(highTierCoverage).toBe(rank.questions.length);
+    expect(legendaryCoverage).toBe(rank.questions.length);
+  });
+
 });
