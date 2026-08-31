@@ -40,9 +40,10 @@ app.get('/api/health/live', publicReadLimit, (_req, res) => res.json({ ok: true,
 app.get('/api/health/ready', publicReadLimit, async (_req, res) => {
   if (lifecycle !== 'ready') return res.status(503).json({ ok: false, lifecycle });
   let database = false;
-  if (admin) {
+  const adminClient = admin;
+  if (adminClient) {
     try {
-      const result = await observe('readiness.supabase', () => admin.rpc('get_app_schema_version'), 750);
+      const result = await observe('readiness.supabase', () => adminClient.rpc('get_app_schema_version'), 750);
       database = !result.error && result.data === EXPECTED_SCHEMA_VERSION;
     } catch { database = false; }
   }

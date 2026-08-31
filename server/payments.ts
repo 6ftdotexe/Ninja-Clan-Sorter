@@ -95,14 +95,15 @@ export function handleCreditPacks(_req: Request, res: Response) {
 }
 
 export async function handleCreateCheckout(req: AuthedRequest, res: Response) {
-  if (!stripe) return res.status(503).json({ error: 'Stripe is not configured yet.' });
+  const stripeClient = stripe;
+  if (!stripeClient) return res.status(503).json({ error: 'Stripe is not configured yet.' });
 
   const packId = String(req.body?.packId || '') as CreditPackId;
   const pack = CREDIT_PACKS[packId];
   if (!pack) return res.status(400).json({ error: 'Unknown credit pack.' });
 
   try {
-    const session = await observe('stripe.checkout.create', () => stripe.checkout.sessions.create({
+    const session = await observe('stripe.checkout.create', () => stripeClient.checkout.sessions.create({
       mode: 'payment',
       customer_email: req.authUser?.email || undefined,
       client_reference_id: req.authUser!.id,

@@ -26,13 +26,15 @@ vi.mock('../diagnostics.js', () => ({
 
 import { handleGenerateShinobi } from '../generation.js';
 
-function responseMock() {
+type TestResponse = Response & { statusCode: number; body: any };
+
+function responseMock(): TestResponse {
   return {
     statusCode: 200,
     body: undefined as unknown,
     status(code: number) { this.statusCode = code; return this; },
     json(body: unknown) { this.body = body; return this; },
-  } as unknown as Response & { statusCode: number; body: any };
+  } as unknown as TestResponse;
 }
 
 function requestMock(): AuthedRequest {

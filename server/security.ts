@@ -88,10 +88,11 @@ export function distributedRateLimit({
 }: DistributedRateLimitOptions): RequestHandler {
   const localFallback = rateLimit({ windowMs, max, key, message });
   return async (req: AuthedRequest, res: Response, next: NextFunction) => {
-    if (!admin) return localFallback(req, res, next);
+    const adminClient = admin;
+    if (!adminClient) return localFallback(req, res, next);
     const rateKey = `${namespace}:${key(req)}`.slice(0, 220);
     try {
-      const { data, error } = await observe('supabase.rateLimit.consume', () => admin.rpc('consume_api_rate_limit', {
+      const { data, error } = await observe('supabase.rateLimit.consume', () => adminClient.rpc('consume_api_rate_limit', {
         p_key: rateKey,
         p_window_seconds: Math.max(1, Math.ceil(windowMs / 1000)),
         p_limit: max,

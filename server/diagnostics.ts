@@ -47,7 +47,7 @@ export function recordError(error: unknown, event: string, fields: Record<string
   return category;
 }
 
-export async function observe<T>(name: string, operation: () => Promise<T>, slowThresholdMs = 1000): Promise<T> {
+export async function observe<T>(name: string, operation: () => PromiseLike<T>, slowThresholdMs = 1000): Promise<T> {
   const start = performance.now();
   let failed = false;
   try {

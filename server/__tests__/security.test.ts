@@ -3,7 +3,9 @@ import type { NextFunction, Request, Response } from 'express';
 import { rateLimit, requireTrustedOrigin, securityHeaders } from '../security.js';
 import { APP_URL, type AuthedRequest } from '../config.js';
 
-function responseMock() {
+type TestResponse = Response & { statusCode: number; body: any };
+
+function responseMock(): { res: TestResponse; headers: Map<string, string> } {
   const headers = new Map<string, string>();
   const res = {
     statusCode: 200,
@@ -11,7 +13,7 @@ function responseMock() {
     setHeader(name: string, value: string) { headers.set(name.toLowerCase(), String(value)); return this; },
     status(code: number) { this.statusCode = code; return this; },
     json(body: unknown) { this.body = body; return this; },
-  } as unknown as Response & { statusCode: number; body: unknown };
+  } as unknown as TestResponse;
   return { res, headers };
 }
 
