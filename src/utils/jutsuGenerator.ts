@@ -1,0 +1,14 @@
+import type {JutsuRank,JutsuTechnique,NormalizedShinobiProfile} from '../types/combat';
+import {deriveCombatStats} from './combatStats';
+const pick=<T,>(items:T[],seed:number)=>items[Math.abs(seed)%items.length];
+const hash=(v:string)=>[...v].reduce((a,c)=>((a<<5)-a+c.charCodeAt(0))|0,0);
+const rankFor=(p:NormalizedShinobiProfile,seed:number):JutsuRank=>{const r=p.rankPotential.toLowerCase();const pool:JutsuRank[]=r.includes('legendary')||r.includes('kage')?['B','A','A','S']:r.includes('elite')||r.includes('jōnin')||r.includes('jonin')?['C','B','A','A']:['D','C','B'];return pick(pool,seed)};
+export function generateTechnique(p:NormalizedShinobiProfile,index=0):JutsuTechnique{
+ const seed=hash(`${p.name}-${p.clan}-${p.primaryChakra}-${p.fightingStyle}-${index}-${Date.now()}`); const stats=deriveCombatStats(p);
+ const nature=p.advancedRelease||[p.primaryChakra,p.secondaryChakra].filter(Boolean).join(' + ')||'Chakra';
+ const prefixes:Record<string,string[]>={Fire:['Ember','Inferno','Crimson'],Wind:['Gale','Razor','Sky'],Lightning:['Volt','Thunder','Flash'],Earth:['Stone','Bastion','Quake'],Water:['Tide','Mist','Torrent']};
+ const prefix=pick(prefixes[p.primaryChakra]||['Shadow','Spirit','Hidden'],seed); const suffix=pick(['Step','Lance','Veil','Current','Formation','Pulse','Prism','Fang','Spiral','Ward'],seed>>2);
+ const style=p.fightingStyle.toLowerCase(); const role=style.includes('support')?'Support':style.includes('control')?'Control':style.includes('stealth')?'Stealth':style.includes('close')?'Close-range':style.includes('precision')?'Precision':'Adaptive';
+ const rank=rankFor(p,seed); const ranges=role==='Close-range'?['Contact','0–5 m']:role==='Precision'?['15–40 m','Long range']:['5–20 m','Mid range'];
+ return {id:`local-${Date.now()}-${Math.abs(seed)}`,name:`${prefix} ${suffix}`,rank,type:rank==='S'?'Secret Technique':rank==='A'?'Advanced Ninjutsu':'Ninjutsu',chakraNature:nature,range:pick(ranges,seed),role,chakraCost:rank==='S'?'Extreme':rank==='A'?'High':rank==='B'?'Moderate':'Low',description:`A ${role.toLowerCase()} technique shaped by ${p.clan||'the user’s bloodline'} instincts and ${nature} chakra. It emphasizes ${p.specialty||p.fightingStyle||'adaptive fieldcraft'} while staying consistent with the shinobi’s established profile.`,strengths:[stats.chakraControl>70?'Exceptional chakra precision':'Reliable execution',stats.speed>70?'Fast activation':'Flexible timing',p.teamRole?`Synergizes with ${p.teamRole}`:'Adaptable squad utility'],weaknesses:[rank==='S'?'Severe chakra drain':'Reduced effectiveness when overused',role==='Close-range'?'Requires proximity':'Needs clean positioning'],requirements:[p.primaryChakra?`${p.primaryChakra} affinity`:'Developed chakra control',p.inheritedPotential||'Advanced chakra discipline'],synergies:[p.secondaryChakra||p.summon||p.weaponAffinity||'Team coordination'],slot:null};
+}
