@@ -7,17 +7,17 @@ const LEGACY_ARCHIVE_KEYS=['shinobiArchiveV9','shinobiArchiveV8','shinobiArchive
 const HISTORY_LIMIT=20;
 
 const memoryStorage=new Map<string,string>();
-const safeStorage:StateStorage={
-  getItem:(name)=>{
+const safeStorage={
+  getItem:(name:string):string|null=>{
     try{
       const value=localStorage.getItem(name);
       if(value&&name.startsWith('shinobiArchive')){try{JSON.parse(value)}catch{localStorage.removeItem(name);return null}}
       return value;
     }catch{return memoryStorage.get(name)??null}
   },
-  setItem:(name,value)=>{try{localStorage.setItem(name,value)}catch{memoryStorage.set(name,value)}},
-  removeItem:(name)=>{try{localStorage.removeItem(name)}catch{memoryStorage.delete(name)}},
-};
+  setItem:(name:string,value:string):void=>{try{localStorage.setItem(name,value)}catch{memoryStorage.set(name,value)}},
+  removeItem:(name:string):void=>{try{localStorage.removeItem(name)}catch{memoryStorage.delete(name)}},
+} satisfies StateStorage;
 
 function migrateLegacyArchive(){
   if(typeof window==='undefined')return;

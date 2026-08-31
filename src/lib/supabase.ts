@@ -20,7 +20,7 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
     })
   : null;
 
-export type SupabaseResult<T> = { data: T; error: unknown };
+export type SupabaseResult<T> = { data: T | null; error: unknown };
 
 export function requireSupabase(): SupabaseClient {
   if (!supabase) throw new Error('Supabase not configured');
@@ -29,7 +29,7 @@ export function requireSupabase(): SupabaseClient {
 
 export function unwrap<T>(result: SupabaseResult<T>): T {
   if (result.error) throw result.error;
-  return result.data;
+  return result.data as T;
 }
 
 export function unwrapRows<T>(result: SupabaseResult<T[] | null>): T[] {

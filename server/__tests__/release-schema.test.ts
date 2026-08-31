@@ -7,7 +7,7 @@ import { runPreflight } from '../preflight.js';
 describe('release contract', () => {
   it('keeps package.json aligned with the server release', async () => {
     await expect(verifyPackageVersion()).resolves.toBeUndefined();
-    expect(APP_VERSION).toBe('10.5.0');
+    expect(APP_VERSION).toBe('10.5.1');
   });
 
   it('ships the TypeScript runtime used by npm start as a production dependency', async () => {

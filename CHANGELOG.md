@@ -1,5 +1,11 @@
 # Changelog
 
+## V10.5.1 — Build Compatibility Hotfix
+
+- Fixed Supabase single-row response typing so `.single()` results can safely pass through shared result helpers when PostgREST failure responses contain `data: null`.
+- Fixed Zustand archive migration storage typing by preserving the synchronous `StateStorage` implementation instead of widening `getItem()` to the async-compatible union type.
+- No database migration required; V10.5.1 continues to target the V10.5.0 Supabase schema.
+
 ## V10.5.0 — Consolidation, Hardening & Stable Production Update
 
 This single post-Phase-4 update consolidates all cleanup, refactoring, production hardening, and release-readiness work completed after the V10 feature phases. The intermediate internal iterations are intentionally folded into this one maintained release entry.

@@ -4,7 +4,7 @@ V10 is the current complete release of the Shinobi Identity Archive: a React + T
 
 ## Production Readiness
 
-V10.5.0 is the consolidated V10 stable release, combining all post-Phase-4 cleanup, hardening, testing, and production-readiness work into one update. Run `npm run release:check` before deployment, keep the deployed Supabase schema at V10.5.0, and verify `/api/health/ready` plus `/api/version` after rollout.
+V10.5.1 is the current V10 maintenance release, applying a TypeScript build-compatibility hotfix on top of the consolidated V10.5.0 stable baseline. Run `npm run release:check` before deployment, keep the deployed Supabase schema at V10.5.0, and verify `/api/health/ready` plus `/api/version` after rollout.
 
 ## Documentation
 
