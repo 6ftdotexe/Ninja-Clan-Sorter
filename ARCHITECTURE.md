@@ -1,3 +1,7 @@
+# V10 Phase 2 Architecture
+
+Mission progression is character-scoped in Supabase (`shinobi_progression`, `shinobi_missions`) and uses an authenticated SQL RPC to atomically resolve missions and apply rewards. Client generation is deterministic/procedural from normalized profile + derived combat stats.
+
 # V9 Architecture
 
 ## Frontend

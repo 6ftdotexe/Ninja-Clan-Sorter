@@ -1,3 +1,9 @@
+# Shinobi Identity Archive V10
+
+V10 Phase 2 adds persistent missions, XP, levels, operational rank progression, village reputation, and achievements on top of the V10 Phase 1 combat stats and jutsu system. Existing V9 account/profile data remains compatible.
+
+See `V10_PHASE1_SETUP.md` and `V10_PHASE2_SETUP.md` for Supabase migrations.
+
 # Shinobi Identity Archive V9
 
 V9 turns the Shinobi Identity Archive into an account-ready platform. It keeps the modular React/TypeScript quiz system and AI portrait generator, then adds Supabase authentication and cloud-saved shinobi characters.
