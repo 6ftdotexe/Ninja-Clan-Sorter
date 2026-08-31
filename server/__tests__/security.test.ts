@@ -10,9 +10,9 @@ function responseMock(): { res: TestResponse; headers: Map<string, string> } {
   const res = {
     statusCode: 200,
     body: undefined as unknown,
-    setHeader(name: string, value: string) { headers.set(name.toLowerCase(), String(value)); return this; },
-    status(code: number) { this.statusCode = code; return this; },
-    json(body: unknown) { this.body = body; return this; },
+    setHeader(this: TestResponse, name: string, value: string) { headers.set(name.toLowerCase(), String(value)); return this; },
+    status(this: TestResponse, code: number) { this.statusCode = code; return this; },
+    json(this: TestResponse, body: unknown) { this.body = body; return this; },
   } as unknown as TestResponse;
   return { res, headers };
 }

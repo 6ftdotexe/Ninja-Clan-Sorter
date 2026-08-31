@@ -32,8 +32,8 @@ function responseMock(): TestResponse {
   return {
     statusCode: 200,
     body: undefined as unknown,
-    status(code: number) { this.statusCode = code; return this; },
-    json(body: unknown) { this.body = body; return this; },
+    status(this: TestResponse, code: number) { this.statusCode = code; return this; },
+    json(this: TestResponse, body: unknown) { this.body = body; return this; },
   } as unknown as TestResponse;
 }
 
