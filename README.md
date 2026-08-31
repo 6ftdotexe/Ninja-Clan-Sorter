@@ -1,63 +1,118 @@
 # Shinobi Identity Archive V10
 
-V10 Phase 2 adds persistent missions, XP, levels, operational rank progression, village reputation, and achievements on top of the V10 Phase 1 combat stats and jutsu system. Existing V9 account/profile data remains compatible.
+V10 is the current complete release of the Shinobi Identity Archive: a React + TypeScript shinobi identity platform with cloud accounts, multiple saved characters, advanced identity trials, paid AI character generation, public profiles, combat stats, jutsu, missions, progression, teams, rivalries, matchups, lore, timelines, and profile customization.
 
-See `V10_PHASE1_SETUP.md` and `V10_PHASE2_SETUP.md` for Supabase migrations.
+## Production Readiness
 
-# Shinobi Identity Archive V9
+V10.5.0 is the consolidated V10 stable release, combining all post-Phase-4 cleanup, hardening, testing, and production-readiness work into one update. Run `npm run release:check` before deployment, keep the deployed Supabase schema at V10.5.0, and verify `/api/health/ready` plus `/api/version` after rollout.
 
-V9 turns the Shinobi Identity Archive into an account-ready platform. It keeps the modular React/TypeScript quiz system and AI portrait generator, then adds Supabase authentication and cloud-saved shinobi characters.
+## Documentation
 
-## What V9 adds
+- `SETUP.md` — install, configure, initialize Supabase, connect OpenAI/Stripe, deploy, and verify production.
+- `ARCHITECTURE.md` — current application structure and data flow.
+- `CHANGELOG.md` — complete V1 → current release history.
 
-- Supabase email/password authentication
-- Persistent user sessions
-- Account dashboard
-- Multiple saved shinobi characters per account
-- Cloud-saved identity/test results
-- Character completion tracking
-- Import of existing local V8/V7/V6 archives
-- Row Level Security policies so users can access only their own data
-- Existing local archive still works when Supabase is not configured
-- Existing AI shinobi generator remains available
+These files evolve with the application. Do not add phase-specific documentation files.
 
-## Local setup
+## Local development
 
-1. Run `npm install`.
-2. Copy `.env.example` to `.env`.
-3. Add your Cloudflare values if using the current image generator.
-4. Create a Supabase project.
-5. Run `supabase/v9.sql` in the Supabase SQL editor.
-6. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to `.env`.
-7. Run `npm run dev`.
+```bash
+npm install
+npm run dev
+```
 
-See `V9_SETUP.md` for account/database setup details.
+Validate before deployment:
 
-## Production
+```bash
+npm run check
+```
 
-Keep private provider keys server-side in Render environment variables. Only the Supabase project URL and public anon/publishable key should use the `VITE_` prefix. Never commit your real `.env`.
+## Current project layout
 
-## Compatibility
+```text
+src/
+  pages/        route-level screens
+  data/         clans + consolidated quiz definitions
+  engine/       scoring engine + consolidated quiz tests
+  features/     character, generator, arsenal, mission, social, lore domains
+  utils/        shared combat/progression calculations
+  contexts/     authentication state
+  store/        active local archive
+  lib/          shared app, UI, and Supabase helpers
+  types.ts      shared application contracts
+server/
+  index.ts      Express API + production lifecycle
+  release.ts    version/build/schema release identity
+  preflight.ts  static/live deployment checks
+supabase/
+  schema.sql    current evolving database schema
+```
 
-V9 uses the local archive key `shinobiArchiveV9` and automatically migrates an existing V8, V7, or V6 archive on first load.
+## Security model
+
+Only browser-safe Supabase values use the `VITE_` prefix. OpenAI, Stripe, and Supabase service-role credentials stay server-side and must never be committed to GitHub. Protected POST routes enforce trusted browser origins and rate limits, and public Shinobi data is exposed through whitelisted RPCs instead of direct public table reads.
+
+See `SETUP.md` for the complete current configuration.
+
+## Codebase consolidation
+
+The maintained frontend is now 25 source files, with related route surfaces grouped by domain rather than split into one-file-per-screen modules.
+
+V10.5.0 keeps related routes and UI surfaces together to reduce file count without collapsing independent domain services into oversized modules. See `ARCHITECTURE.md` for the current structure.
 
 
-## V9 Phase 2
-Adds seven advanced identity trials (Fighting Style, Weapon Affinity, Leadership Style, Rank Potential, Inherited Potential, Shinobi Specialty, Team Role), 13-trial completion progression, archive ranks, badges, and cloud completion mapping.
+### Server modules
 
+The production API is intentionally split into a small set of focused modules: `server/index.ts` (routing/bootstrap/lifecycle), `server/config.ts` (server configuration/auth/credits), `server/release.ts` + `server/preflight.ts` (release identity and deployment gates), `server/payments.ts` (Stripe), and `server/generation.ts` (OpenAI image generation).
 
-## V9 Phase 3
-Paid OpenAI image generation, Stripe credit packs, atomic credit reservations/refunds, and account-gated generation. See `PHASE3_SETUP.md`.
+## Performance model
 
+V10.5.0 code-splits route modules, cursor-paginates public discovery, bundles public profile reads, caches aggregate world statistics, reduces social hydration queries, and uses Supabase-backed distributed throttling for costly API routes. The existing compact file structure is preserved; performance work does not re-expand the project into one file per route.
 
-## V9 Phase 4
+## Automated regression coverage
 
-Phase 4 adds the Shinobi World: publishable character profiles, share links, active characters, a Discover page, and aggregate public clan/village/chakra/rank/summon statistics. Run `supabase/v9-phase4.sql` after the earlier V9 migrations.
+The V10.5.0 stable update includes a compact regression suite around the hardened production paths without introducing a separate testing framework or test documentation tree. Vitest now covers quiz/scoring behavior, security middleware, Stripe pack validation, generation input/failure recovery, release/preflight contracts, Supabase schema permissions, and API smoke behavior.
 
+```bash
+npm run test:unit
+npm run test:smoke
+npm run test:regression
+npm run release:check
+```
 
-## V10 Phase 3
-Teams, rivals, squad analysis and matchup projections are documented in `V10_PHASE3.md` and `V10_PHASE3_SETUP.md`.
+`test:unit` exercises deterministic business/security contracts. `test:smoke` boots the Express application on an ephemeral local port and verifies core public API behavior, request correlation, security headers, and diagnostics protection. `release:check` runs the complete regression suite, TypeScript/Vite build validation, and a post-build artifact preflight that verifies `dist/index.html` plus the generated `dist/release.json` version contract.
 
+## Production observability
 
-## V10 Phase 4
-Adds the Shinobi Chronicle, editable lore, Bingo Book intelligence entries, character timelines, aliases/titles, profile themes, banners, featured artwork, and expanded public profiles. See `V10_PHASE4_SETUP.md`.
+The V10.5.0 stable update includes structured JSON request/event logs, per-request correlation IDs, operation timing, slow-operation warnings, categorized error counts, separate liveness/readiness probes, and an optional protected diagnostics snapshot. The server intentionally does not log authorization headers, prompt contents, photos, generated image data, emails, user IDs, or request bodies.
+
+Health endpoints:
+
+```text
+GET /api/health
+GET /api/health/live
+GET /api/health/ready
+```
+
+If `DIAGNOSTICS_TOKEN` is configured, internal aggregate diagnostics are available from:
+
+```text
+GET /api/internal/diagnostics
+X-Diagnostics-Token: <DIAGNOSTICS_TOKEN>
+```
+
+The diagnostics snapshot is process-local and is intended for fast production troubleshooting rather than permanent analytics storage.
+## Deployment and release hardening
+
+The V10.5.0 stable update treats a deploy as one coordinated frontend/server/schema release. `npm run release:check` runs the test/build path plus static preflight validation, while production startup performs a live schema-version preflight before listening. The process enters a draining readiness state on `SIGTERM`/`SIGINT`, stops accepting new connections, closes idle keep-alive sockets, and allows in-flight requests up to 25 seconds to finish.
+
+Release identity is available from:
+
+```text
+GET /api/version
+```
+
+The response reports the actual bundled frontend manifest, server version, database schema version, commit/build metadata, and whether all three release surfaces match. Hashed frontend assets remain immutable; `dist/release.json` is generated during every Vite build and is used by the server to verify the frontend bundle it is serving.
+
+For production rollouts, apply the current `supabase/schema.sql` first, deploy the application second, and configure Render health checks to use `/api/health/ready`.
+

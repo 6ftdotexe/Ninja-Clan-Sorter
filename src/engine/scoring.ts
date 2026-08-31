@@ -1,4 +1,4 @@
-import type {Question,ScoreMap,TestDefinition,TestResult} from '../types/quiz';
+import type {Question,ScoreMap,TestDefinition,TestResult} from '../types';
 
 export function shuffle<T>(items:T[],random=Math.random):T[]{
   const copy=[...items];
