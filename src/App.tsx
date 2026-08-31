@@ -1,20 +1,90 @@
-import {Navigate,Route,Routes} from 'react-router-dom';
-import {Layout} from './components/Layout';
-import {HomePage} from './pages/HomePage';
-import {ArchivePage} from './pages/ArchivePage';
-import {QuizPage} from './pages/QuizPage';
-import {ResultPage} from './pages/ResultPage';
-import {DossierPage} from './pages/DossierPage';
-import {GeneratorPage} from './pages/GeneratorPage';
-import {LoginPage} from './pages/LoginPage';
-import {SignupPage} from './pages/SignupPage';
-import {AccountPage} from './pages/AccountPage';
-import {DiscoverPage} from './pages/DiscoverPage';
-import {PublicProfilePage} from './pages/PublicProfilePage';
-import {ArsenalPage} from './pages/ArsenalPage';
-import {MissionsPage} from './pages/MissionsPage';
-import {TeamsPage} from './pages/TeamsPage';
-import {RivalsPage} from './pages/RivalsPage';
-import {MatchupsPage} from './pages/MatchupsPage';
-import {ChroniclePage} from './pages/ChroniclePage';
-export default function App(){return <Routes><Route element={<Layout/>}><Route path="/" element={<HomePage/>}/><Route path="/archive" element={<ArchivePage/>}/><Route path="/test/:testId" element={<QuizPage/>}/><Route path="/result/:testId" element={<ResultPage/>}/><Route path="/dossier" element={<DossierPage/>}/><Route path="/generator" element={<GeneratorPage/>}/><Route path="/login" element={<LoginPage/>}/><Route path="/signup" element={<SignupPage/>}/><Route path="/account" element={<AccountPage/>}/><Route path="/discover" element={<DiscoverPage/>}/><Route path="/arsenal" element={<ArsenalPage/>}/><Route path="/missions" element={<MissionsPage/>}/><Route path="/teams" element={<TeamsPage/>}/><Route path="/rivals" element={<RivalsPage/>}/><Route path="/matchups" element={<MatchupsPage/>}/><Route path="/chronicle" element={<ChroniclePage/>}/><Route path="/shinobi/:slug" element={<PublicProfilePage/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Route></Routes>}
+import {Component,lazy,Suspense,type CSSProperties,type ErrorInfo,type ReactNode} from 'react';
+import {Navigate,Outlet,Route,Routes,useNavigate} from 'react-router-dom';
+import {useAuth} from './contexts/AuthContext';
+import {clanThemes} from './data/clans';
+import {useArchive} from './store/useArchive';
+
+const ArchivePage=lazy(()=>import('./pages/IdentityPages').then(m=>({default:m.ArchivePage})));
+const DossierPage=lazy(()=>import('./pages/IdentityPages').then(m=>({default:m.DossierPage})));
+const QuizPage=lazy(()=>import('./pages/IdentityPages').then(m=>({default:m.QuizPage})));
+const ResultPage=lazy(()=>import('./pages/IdentityPages').then(m=>({default:m.ResultPage})));
+const GeneratorPage=lazy(()=>import('./pages/GeneratorPage').then(m=>({default:m.GeneratorPage})));
+const AccountPage=lazy(()=>import('./pages/AccountPages').then(m=>({default:m.AccountPage})));
+const HomePage=lazy(()=>import('./pages/AccountPages').then(m=>({default:m.HomePage})));
+const LoginPage=lazy(()=>import('./pages/AccountPages').then(m=>({default:m.LoginPage})));
+const SignupPage=lazy(()=>import('./pages/AccountPages').then(m=>({default:m.SignupPage})));
+const DiscoverPage=lazy(()=>import('./pages/CommunityPages').then(m=>({default:m.DiscoverPage})));
+const PublicProfilePage=lazy(()=>import('./pages/CommunityPages').then(m=>({default:m.PublicProfilePage})));
+const ArsenalPage=lazy(()=>import('./pages/SystemPages').then(m=>({default:m.ArsenalPage})));
+const ChroniclePage=lazy(()=>import('./pages/SystemPages').then(m=>({default:m.ChroniclePage})));
+const MissionsPage=lazy(()=>import('./pages/SystemPages').then(m=>({default:m.MissionsPage})));
+const MatchupsPage=lazy(()=>import('./pages/SocialPages').then(m=>({default:m.MatchupsPage})));
+const RivalsPage=lazy(()=>import('./pages/SocialPages').then(m=>({default:m.RivalsPage})));
+const TeamsPage=lazy(()=>import('./pages/SocialPages').then(m=>({default:m.TeamsPage})));
+
+const mainNav = [
+  ['/discover','Discover'],
+  ['/arsenal','Arsenal'],
+  ['/missions','Missions'],
+  ['/teams','Teams'],
+  ['/chronicle','Chronicle'],
+] as const;
+
+function RouteFallback(){return <div className="screen"><p className="muted">Loading archive module…</p></div>}
+
+class RouteErrorBoundary extends Component<{children:ReactNode},{failed:boolean}> {
+  state={failed:false};
+  static getDerivedStateFromError(){return {failed:true}}
+  componentDidCatch(error:Error,info:ErrorInfo){console.error('Route render failed',error,info.componentStack)}
+  render(){
+    if(this.state.failed)return <div className="screen"><p className="eyebrow">MODULE ERROR</p><h2>This part of the archive could not load.</h2><p className="muted">A deployment may have changed while this tab was open. Reload to fetch the current application files.</p><button className="primary" onClick={()=>window.location.reload()}>Reload archive</button></div>;
+    return this.props.children;
+  }
+}
+
+export function Layout(){
+  const navigate=useNavigate();
+  const clan=useArchive(state=>state.results.clan?.winner);
+  const theme=clan?clanThemes[clan]:undefined;
+  const {user,configured}=useAuth();
+  const style=theme?{'--accent':theme.accent,'--accent2':theme.accent2,'--glow':theme.glow} as CSSProperties:undefined;
+
+  return <main className="app" style={style}>
+    <header className="brand">
+      <button className="brand-left brand-btn" onClick={()=>navigate('/archive')}>
+        <span className="crest">忍</span>
+        <span><strong>Shinobi Identity Archive</strong><small>identity platform</small></span>
+      </button>
+      <div className="brand-actions">
+        {mainNav.map(([path,label])=><button className="nav-chip" key={path} onClick={()=>navigate(path)}>{label}</button>)}
+        <span className="edition">V10 · COMPLETE</span>
+        {configured&&<button className="account-chip" onClick={()=>navigate(user?'/account':'/login')}>{user?'My Account':'Sign In'}</button>}
+      </div>
+    </header>
+    <section className="card route-stage"><RouteErrorBoundary><Suspense fallback={<RouteFallback/>}><Outlet/></Suspense></RouteErrorBoundary></section>
+    <footer>Unofficial fan-made personality experience. React + TypeScript · V{__APP_VERSION__} · Identity, combat, missions, social systems, and chronicle.</footer>
+  </main>;
+}
+
+export default function App(){
+  return <Routes><Route element={<Layout/>}>
+    <Route path="/" element={<HomePage/>}/>
+    <Route path="/archive" element={<ArchivePage/>}/>
+    <Route path="/test/:testId" element={<QuizPage/>}/>
+    <Route path="/result/:testId" element={<ResultPage/>}/>
+    <Route path="/dossier" element={<DossierPage/>}/>
+    <Route path="/generator" element={<GeneratorPage/>}/>
+    <Route path="/login" element={<LoginPage/>}/>
+    <Route path="/signup" element={<SignupPage/>}/>
+    <Route path="/account" element={<AccountPage/>}/>
+    <Route path="/discover" element={<DiscoverPage/>}/>
+    <Route path="/arsenal" element={<ArsenalPage/>}/>
+    <Route path="/missions" element={<MissionsPage/>}/>
+    <Route path="/teams" element={<TeamsPage/>}/>
+    <Route path="/rivals" element={<RivalsPage/>}/>
+    <Route path="/matchups" element={<MatchupsPage/>}/>
+    <Route path="/chronicle" element={<ChroniclePage/>}/>
+    <Route path="/shinobi/:slug" element={<PublicProfilePage/>}/>
+    <Route path="*" element={<Navigate to="/" replace/>}/>
+  </Route></Routes>;
+}
