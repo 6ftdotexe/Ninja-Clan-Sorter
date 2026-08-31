@@ -53,3 +53,7 @@ Paid OpenAI image generation, Stripe credit packs, atomic credit reservations/re
 ## V9 Phase 4
 
 Phase 4 adds the Shinobi World: publishable character profiles, share links, active characters, a Discover page, and aggregate public clan/village/chakra/rank/summon statistics. Run `supabase/v9-phase4.sql` after the earlier V9 migrations.
+
+
+## V10 Phase 3
+Teams, rivals, squad analysis and matchup projections are documented in `V10_PHASE3.md` and `V10_PHASE3_SETUP.md`.

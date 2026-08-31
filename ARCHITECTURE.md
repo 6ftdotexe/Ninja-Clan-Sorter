@@ -36,3 +36,7 @@ The six personality tests remain data-driven and independent. The visual generat
 - Image generation keeps Sensei and Shadow Mirror names in the app UI, but converts them to abstract personality/tactical traits before sending the image prompt.
 - Named-character visual imitation is intentionally avoided.
 - For Uchiha-like eye traits, the prompt requests an original invented red-eye pattern rather than a recognizable canon design.
+
+
+## V10 Phase 3
+Teams, rivals, squad analysis and matchup projections are documented in `V10_PHASE3.md` and `V10_PHASE3_SETUP.md`.
