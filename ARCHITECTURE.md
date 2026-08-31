@@ -40,3 +40,7 @@ The six personality tests remain data-driven and independent. The visual generat
 
 ## V10 Phase 3
 Teams, rivals, squad analysis and matchup projections are documented in `V10_PHASE3.md` and `V10_PHASE3_SETUP.md`.
+
+
+## V10 Phase 4
+`ChroniclePage` combines the normalized identity profile and derived combat stats with `loreGenerator.ts`. `loreService.ts` persists lore/timeline data in `character_lore` and `character_timeline_events`. Public RLS policies expose those rows only when the owning shinobi character is published.

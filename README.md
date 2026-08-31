@@ -57,3 +57,7 @@ Phase 4 adds the Shinobi World: publishable character profiles, share links, act
 
 ## V10 Phase 3
 Teams, rivals, squad analysis and matchup projections are documented in `V10_PHASE3.md` and `V10_PHASE3_SETUP.md`.
+
+
+## V10 Phase 4
+Adds the Shinobi Chronicle, editable lore, Bingo Book intelligence entries, character timelines, aliases/titles, profile themes, banners, featured artwork, and expanded public profiles. See `V10_PHASE4_SETUP.md`.

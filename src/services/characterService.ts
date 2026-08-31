@@ -1,7 +1,7 @@
 import {supabase} from '../lib/supabase';
 import type {TestId,TestResult} from '../types/quiz';
 
-export type ShinobiCharacter={id:string;user_id:string;name:string;clan:string|null;village:string|null;chakra_primary:string|null;chakra_secondary:string|null;advanced_release:string|null;summon:string|null;sensei:string|null;shadow_mirror:string|null;rank:string|null;role:string|null;leadership:string|null;inherited_trait:string|null;specialization:string|null;portrait_url:string|null;completion_percent:number;is_active:boolean;is_public:boolean;public_slug:string|null;bio:string|null;published_at:string|null;created_at:string;updated_at:string};
+export type ShinobiCharacter={id:string;user_id:string;name:string;clan:string|null;village:string|null;chakra_primary:string|null;chakra_secondary:string|null;advanced_release:string|null;summon:string|null;sensei:string|null;shadow_mirror:string|null;rank:string|null;role:string|null;leadership:string|null;inherited_trait:string|null;specialization:string|null;portrait_url:string|null;completion_percent:number;is_active:boolean;is_public:boolean;public_slug:string|null;bio:string|null;published_at:string|null;shinobi_alias:string|null;profile_title:string|null;profile_theme:string|null;banner_url:string|null;featured_art_url:string|null;created_at:string;updated_at:string};
 
 const winner=(results:Partial<Record<TestId,TestResult>>,id:TestId)=>results[id]?.winner??null;
 export function archiveToCharacter(name:string,results:Partial<Record<TestId,TestResult>>){

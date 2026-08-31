@@ -187,7 +187,7 @@ app.use(express.json({ limit: '14mb' }));
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
-    service: 'shinobi-v9-phase3',
+    service: 'shinobi-v10-phase4',
     imageProvider: 'openai',
     imageModel: OPENAI_IMAGE_MODEL,
     paymentsConfigured: Boolean(stripe && stripeWebhookSecret),
