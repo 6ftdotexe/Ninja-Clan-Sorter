@@ -1,5 +1,0 @@
-import {testOrder} from '../data/tests';import type {TestId,TestResult} from '../types/quiz';
-export const TOTAL_TRIALS=testOrder.length;
-export function completion(results:Partial<Record<TestId,TestResult>>){const done=testOrder.filter(id=>!!results[id]).length;return {done,total:TOTAL_TRIALS,percent:Math.round(done/TOTAL_TRIALS*100)}}
-export function archiveRank(done:number){if(done>=13)return 'Legendary Archive';if(done>=11)return 'Kage Candidate';if(done>=9)return 'Elite Jōnin';if(done>=7)return 'Jōnin';if(done>=5)return 'Special Jōnin';if(done>=3)return 'Chūnin';if(done>=1)return 'Genin';return 'Academy';}
-export function earnedBadges(results:Partial<Record<TestId,TestResult>>){const c=completion(results);const badges=[{id:'first',label:'First Step',icon:'◆',earned:c.done>=1},{id:'core',label:'Core Identity',icon:'六',earned:['clan','village','chakra','summon','mentor','rogue'].every(id=>!!results[id as TestId])},{id:'half',label:'Halfway There',icon:'◐',earned:c.done>=7},{id:'advanced',label:'Advanced Operative',icon:'★',earned:c.done>=10},{id:'complete',label:'Identity Complete',icon:'忍',earned:c.done===c.total}];return badges;}

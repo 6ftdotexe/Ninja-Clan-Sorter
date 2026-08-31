@@ -1,2 +1,0 @@
-import {Navigate,useNavigate} from 'react-router-dom';import {Dossier} from '../components/Dossier';import {testOrder} from '../data/tests';import {useArchive} from '../store/useArchive';
-export function DossierPage(){const navigate=useNavigate();const results=useArchive(s=>s.results);if(!testOrder.every(id=>results[id]))return <Navigate to="/archive" replace/>;return <div className="page-enter"><Dossier onBack={()=>navigate('/archive')}/></div>}
