@@ -1,7 +1,7 @@
 {
   "name": "shinobi-identity-archive-v10",
   "private": true,
-  "version": "10.4.0",
+  "version": "10.5.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:web\" \"npm:dev:server\"",
@@ -10,7 +10,8 @@
     "build": "tsc -p tsconfig.app.json && vite build",
     "start": "NODE_ENV=production tsx server/index.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check": "npm run test && npm run build"
   },
   "dependencies": {
     "dotenv": "^16.6.1",

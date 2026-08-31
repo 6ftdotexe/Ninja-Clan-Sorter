@@ -33,8 +33,8 @@ export function ChroniclePage(){
   };
   useEffect(()=>{void refresh().catch(e=>setError(e instanceof Error?e.message:'Could not load chronicle'))},[user?.id,activeCharacterId]);
 
-  if(!user)return <div className="screen"><span className="eyebrow">V10 · PHASE 4</span><h2>Sign in to build your chronicle</h2><p className="lede">Lore, timelines, titles, and profile customization are saved to your cloud shinobi.</p><button className="btn primary" onClick={()=>nav('/login')}>Sign In</button></div>;
-  if(!activeCharacterId)return <div className="screen"><span className="eyebrow">V10 · PHASE 4</span><h2>Open a shinobi first</h2><p className="lede">Choose a saved shinobi from your account before building a chronicle.</p><button className="btn primary" onClick={()=>nav('/account')}>Open Account</button></div>;
+  if(!user)return <div className="screen"><span className="eyebrow">V10 · CHRONICLE</span><h2>Sign in to build your chronicle</h2><p className="lede">Lore, timelines, titles, and profile customization are saved to your cloud shinobi.</p><button className="btn primary" onClick={()=>nav('/login')}>Sign In</button></div>;
+  if(!activeCharacterId)return <div className="screen"><span className="eyebrow">V10 · CHRONICLE</span><h2>Open a shinobi first</h2><p className="lede">Choose a saved shinobi from your account before building a chronicle.</p><button className="btn primary" onClick={()=>nav('/account')}>Open Account</button></div>;
 
   const run=async(fn:()=>Promise<void>)=>{setBusy(true);setError('');setNotice('');try{await fn()}catch(e){setError(e instanceof Error?e.message:'Chronicle action failed')}finally{setBusy(false)}};
   const createLore=()=>run(async()=>{const draft=generateLoreDraft(profile,stats,user.id);const saved=await saveLore(draft);setLore(saved);if(!timeline.length){const created=await replaceTimeline(user.id,activeCharacterId,generateTimelineDraft(profile,user.id));setTimeline(created)}setNotice('Chronicle generated from this shinobi identity.')});
@@ -47,7 +47,7 @@ export function ChroniclePage(){
 
   return <div className={`screen chronicle-page theme-${theme} page-enter`}>
     <div className="chronicle-banner" style={banner?{backgroundImage:`linear-gradient(90deg,rgba(4,7,12,.92),rgba(4,7,12,.35)),url(${banner})`}:undefined}>
-      <div><span className="eyebrow">V10 · PHASE 4 · SHINOBI CHRONICLE</span><h2>{alias||character?.name||profile.name}</h2><p>{title||'Build the legend behind the identity.'}</p></div>
+      <div><span className="eyebrow">V10 · SHINOBI CHRONICLE</span><h2>{alias||character?.name||profile.name}</h2><p>{title||'Build the legend behind the identity.'}</p></div>
       {featured&&<img src={featured} alt="Featured shinobi artwork"/>}
     </div>
     {error&&<div className="generator-error">{error}</div>}{notice&&<div className="generator-notice">{notice}</div>}

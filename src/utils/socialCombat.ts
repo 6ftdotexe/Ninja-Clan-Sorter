@@ -12,7 +12,7 @@ export function characterToProfile(c:ShinobiCharacter):NormalizedShinobiProfile{
 }
 export function characterCombatant(c:ShinobiCharacter):SocialCombatant{return {character:c,stats:deriveCombatStats(characterToProfile(c))}}
 const avg=(s:CombatStats,keys:StatKey[])=>Math.round(keys.reduce((a,k)=>a+s[k],0)/keys.length);
-const edge=(a:number,b:number)=>Math.abs(a-b)<4?'even':a>b?'left':'right';
+const edge=(a:number,b:number):'left'|'right'|'even'=>Math.abs(a-b)<4?'even':a>b?'left':'right';
 const natureCounter=(a:string,b:string)=>{
  const x=a.toLowerCase(),y=b.toLowerCase();
  const pairs:[string,string,string][]=[['water','fire','Water can suppress Fire'],['fire','wind','Fire can exploit Wind-fed pressure'],['wind','lightning','Wind can disrupt Lightning flow'],['lightning','earth','Lightning can pierce Earth defenses'],['earth','water','Earth can contain Water movement']];
@@ -37,8 +37,8 @@ export function analyzeMatchup(left:SocialCombatant,right:SocialCombatant):Match
  if(right.character.summon&&!left.character.summon){rightScore+=2;counters.push(`${right.character.name}'s summon adds field presence.`)}
  const diff=leftScore-rightScore; const winnerId=Math.abs(diff)<2?null:(diff>0?left.character.id:right.character.id); const winnerName=winnerId?(diff>0?left.character.name:right.character.name):'Even Match';
  const confidence=Math.min(88,50+Math.abs(diff)*4);
- const topL=Object.entries(l).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k])=>k.replace(/([A-Z])/g,' $1').toLowerCase());
- const topR=Object.entries(r).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k])=>k.replace(/([A-Z])/g,' $1').toLowerCase());
+ const topL=(Object.entries(l) as [StatKey,number][]).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k])=>k.replace(/([A-Z])/g,' $1').toLowerCase());
+ const topR=(Object.entries(r) as [StatKey,number][]).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k])=>k.replace(/([A-Z])/g,' $1').toLowerCase());
  return {winnerId,winnerName,confidence,leftScore,rightScore,summary:winnerId?`${winnerName} holds the stronger projected matchup, but the result depends on controlling tempo and forcing the fight into favorable ranges.`:'The profiles are close enough that tactical choices and terrain are more important than raw ratings.',factors,counters,winConditions:{left:[`Lean on ${topL.join(' and ')}.`,`Force ${right.character.name} away from their strongest range.`,`Use ${left.character.chakra_primary||'chakra'} creatively to control tempo.`],right:[`Lean on ${topR.join(' and ')}.`,`Disrupt ${left.character.name}'s preferred rhythm.`,`Use ${right.character.chakra_primary||'chakra'} to create a favorable opening.`]}};
 }
 export function analyzeTeam(members:SocialCombatant[]):TeamAnalysis{
