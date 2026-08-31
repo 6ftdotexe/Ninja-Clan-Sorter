@@ -7,14 +7,15 @@ type TestResponse = Response & { statusCode: number; body: any };
 
 function responseMock(): { res: TestResponse; headers: Map<string, string> } {
   const headers = new Map<string, string>();
-  const res = {
-    statusCode: 200,
-    body: undefined as unknown,
-    setHeader(name: string, value: string) { headers.set(name.toLowerCase(), String(value)); return this; },
-    status(code: number) { this.statusCode = code; return this; },
-    json(body: unknown) { this.body = body; return this; },
-  } as unknown as TestResponse;
-  return { res, headers };
+  const state = { statusCode: 200, body: undefined as unknown };
+  const raw: Record<string, unknown> = {
+    get statusCode() { return state.statusCode; },
+    get body() { return state.body; },
+  };
+  raw.setHeader = (name: string, value: string) => { headers.set(name.toLowerCase(), String(value)); return raw; };
+  raw.status = (code: number) => { state.statusCode = code; return raw; };
+  raw.json = (body: unknown) => { state.body = body; return raw; };
+  return { res: raw as unknown as TestResponse, headers };
 }
 
 describe('security middleware', () => {

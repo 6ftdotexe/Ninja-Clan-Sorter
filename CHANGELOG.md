@@ -10,6 +10,8 @@
 - Fixed Supabase single-row response typing so `.single()` results can safely pass through shared result helpers when PostgREST failure responses contain `data: null`.
 - Fixed Zustand archive migration storage typing by preserving the synchronous `StateStorage` implementation instead of widening `getItem()` to the async-compatible union type.
 - No database migration required; V10.5.1 continues to target the V10.5.0 Supabase schema.
+- Fixed strict TypeScript compilation for server test response mocks by removing method-level `this` mutation from mocked Express responses.
+
 
 ## V10.5.0 — Consolidation, Hardening & Stable Production Update
 

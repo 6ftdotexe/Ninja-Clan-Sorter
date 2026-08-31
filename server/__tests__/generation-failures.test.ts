@@ -29,12 +29,14 @@ import { handleGenerateShinobi } from '../generation.js';
 type TestResponse = Response & { statusCode: number; body: any };
 
 function responseMock(): TestResponse {
-  return {
-    statusCode: 200,
-    body: undefined as unknown,
-    status(code: number) { this.statusCode = code; return this; },
-    json(body: unknown) { this.body = body; return this; },
-  } as unknown as TestResponse;
+  const state = { statusCode: 200, body: undefined as unknown };
+  const raw: Record<string, unknown> = {
+    get statusCode() { return state.statusCode; },
+    get body() { return state.body; },
+  };
+  raw.status = (code: number) => { state.statusCode = code; return raw; };
+  raw.json = (body: unknown) => { state.body = body; return raw; };
+  return raw as unknown as TestResponse;
 }
 
 function requestMock(): AuthedRequest {
