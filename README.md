@@ -1,9 +1,9 @@
 # Shinobi Identity Archive — V11
 
 
-## V11.5.0 — Interactive Gameplay
+## V11.5.1 — Interactive Gameplay
 
-V11.5.0 converts the major non-quiz progression actions into playable field activities. Missions, training, jutsu mastery, Chūnin Exam stages, World Events, co-op operations, and Village War deployments now launch a three-round mini-game sequence built around chakra timing, hand-sign memory, and tactical decisions. Mission outcomes directly combine player execution with the shinobi build instead of resolving from stats alone.
+V11.5.1 converts the major non-quiz progression actions into playable field activities. Missions, training, jutsu mastery, Chūnin Exam stages, World Events, co-op operations, and Village War deployments now launch a three-round mini-game sequence built around chakra timing, hand-sign memory, and tactical decisions. Mission outcomes directly combine player execution with the shinobi build instead of resolving from stats alone.
 
 This is an application-only gameplay update. It runs against the existing V11.4.0 Supabase schema, so no schema migration is required when upgrading from V11.4.0.
 V11 is the current major release of the Shinobi Identity Archive. Phase 5 turns squads and villages into shared operational systems: teams can deploy into cooperative missions, village-aligned squads can contribute to a persistent village-war season, and career/training progression feeds directly into team performance.

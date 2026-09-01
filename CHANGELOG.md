@@ -1,5 +1,19 @@
 # Changelog
 
+## V11.5.1 — Activity-Specific Mini-Game Refinement
+
+- Replaced the shared three-drill sequence with activity-specific mini-game plans.
+- Missions now emphasize stealth decisions, reaction, and extraction timing.
+- Training now emphasizes reaction speed, chakra precision, and execution combos.
+- Chūnin Exams now emphasize memory, tactical judgment, and practical execution.
+- World Events now emphasize crisis response, incident command, and critical timing.
+- Co-op missions now emphasize squad signals, formation decisions, and coordinated commands.
+- Village Wars now emphasize frontline decisions, counterattack reaction, and battle formations.
+- Jutsu Mastery now emphasizes hand-sign recall, chakra molding, and technique execution.
+- Added reaction-grid and timed combo mini-games with difficulty scaling.
+- Preserved the V11.4.0 Supabase schema; no migration required.
+
+
 ## V11.5.0 — Interactive Gameplay Update
 
 - Replaced one-click mission resolution with a three-round interactive field challenge.
