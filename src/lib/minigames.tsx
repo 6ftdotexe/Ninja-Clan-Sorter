@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useState} from 'react';
-import type {CombatStats,JutsuTechnique,MissionRank} from '../types';
+import type {CombatStats,EquipmentInventoryItem,JutsuTechnique,MissionRank} from '../types';
 
 export type ActivityKind='mission'|'training'|'exam'|'world'|'team'|'war'|'mastery';
 export type ActivityResult={score:number;passed:boolean;rounds:number[]};
@@ -130,6 +130,9 @@ export function ActivityChallenge({kind,title,difficulty=55,focus,onComplete,onC
 
 
 export type CombatAffinity='pressure'|'control'|'adaptive';
+export type CombatElement='Fire'|'Water'|'Wind'|'Lightning'|'Earth'|'Wood'|'Ice'|'Neutral';
+export type CombatStatusKind='burn'|'soaked'|'shocked'|'slowed'|'exposed'|'fortified'|'evasive';
+export type CombatStatus={kind:CombatStatusKind;label:string;turns:number;potency:number};
 export type CombatOpponent={
   name:string;
   style:string;
@@ -139,10 +142,11 @@ export type CombatOpponent={
   hp?:number;
   chakra?:number;
   technique?:string;
+  element?:string;
   boss?:boolean;
   portraitUrl?:string|null;
 };
-export type CombatResult={score:number;won:boolean;rounds:number;hp:number;chakra:number};
+export type CombatResult={score:number;won:boolean;rounds:number;hp:number;chakra:number;ultimateUsed?:boolean;summonUsed?:boolean;statusesApplied?:number};
 
 export type MissionAdventureResult={score:number;passed:boolean;stageScores:number[];route:string[]};
 
@@ -155,6 +159,9 @@ type MissionAdventureProps={
   category?:string;
   combatStats?:CombatStats;
   jutsu?:JutsuTechnique[];
+  equipment?:EquipmentInventoryItem[];
+  summon?:string;
+  playerElement?:string;
   onComplete:(result:MissionAdventureResult)=>void|Promise<void>;
   onCancel:()=>void;
 };
@@ -198,11 +205,12 @@ function missionOpponent(rank:MissionRank,category:string|undefined,location:str
     hp:missionRankHp[rank]+Math.max(0,choice.risk),
     chakra:rank==='S'?125:rank==='A'?115:100,
     technique,
+    element: affinity==='pressure'?'Fire':affinity==='control'?'Water':'Wind',
     boss:rank==='A'||rank==='S',
   };
 }
 
-export function MissionAdventure({title,difficulty=55,objective,location,rank='C',category,combatStats,jutsu,onComplete,onCancel}:MissionAdventureProps){
+export function MissionAdventure({title,difficulty=55,objective,location,rank='C',category,combatStats,jutsu,equipment,summon,playerElement,onComplete,onCancel}:MissionAdventureProps){
   const [stageIndex,setStageIndex]=useState(0);
   const [choice,setChoice]=useState<MissionStageChoice|null>(null);
   const [scores,setScores]=useState<number[]>([]);
@@ -225,7 +233,7 @@ export function MissionAdventure({title,difficulty=55,objective,location,rank='C
   const passed=!criticalFailure&&finalScore>=passMark;
   if(choice&&stageIndex===1){
     const opponent=missionOpponent(rank,category,location,choice);
-    return <CombatEncounter title={`${title} · Objective Encounter`} opponent={opponent} stats={combatStats} jutsu={jutsu} difficulty={clamp(difficulty+choice.risk,28,98)} onCancel={()=>setChoice(null)} onComplete={result=>commitScore(result.score,result.won)}/>;
+    return <CombatEncounter title={`${title} · Objective Encounter`} opponent={opponent} stats={combatStats} jutsu={jutsu} equipment={equipment} summon={summon} playerElement={playerElement} difficulty={clamp(difficulty+choice.risk,28,98)} onCancel={()=>setChoice(null)} onComplete={result=>commitScore(result.score,result.won)}/>;
   }
   if(choice&&!finished){
     return <ActivityChallenge kind={choice.kind} title={`${title} · ${stage.name}`} difficulty={clamp(difficulty+choice.risk,25,95)} focus={`${stage.brief} Route: ${choice.label}. ${choice.detail}`} onCancel={()=>setChoice(null)} onComplete={result=>commitScore(result.score,result.passed)}/>;
@@ -239,54 +247,136 @@ export function MissionAdventure({title,difficulty=55,objective,location,rank='C
 
 
 export type ExamAdventureResult={score:number;passed:boolean;segments:string[];segmentScores:number[]};
-type ExamAdventureProps={stage:'tactical'|'survival'|'preliminaries'|'finals';title:string;difficulty?:number;combatStats?:CombatStats;jutsu?:JutsuTechnique[];onComplete:(result:ExamAdventureResult)=>void|Promise<void>;onCancel:()=>void};
+type ExamAdventureProps={stage:'tactical'|'survival'|'preliminaries'|'finals';title:string;difficulty?:number;combatStats?:CombatStats;jutsu?:JutsuTechnique[];equipment?:EquipmentInventoryItem[];summon?:string;playerElement?:string;onComplete:(result:ExamAdventureResult)=>void|Promise<void>;onCancel:()=>void};
 
 const JUTSU_COST:Record<string,number>={Low:14,Moderate:22,High:32,Extreme:44};
 const RANK_POWER:Record<string,number>={D:8,C:12,B:18,A:25,S:34};
+const RANK_COOLDOWN:Record<string,number>={D:1,C:1,B:2,A:3,S:4};
+const ELEMENT_EDGE:Record<CombatElement,CombatElement>={Fire:'Wind',Wind:'Lightning',Lightning:'Earth',Earth:'Water',Water:'Fire',Wood:'Earth',Ice:'Water',Neutral:'Neutral'};
+const STATUS_LABELS:Record<CombatStatusKind,string>={burn:'Burning',soaked:'Soaked',shocked:'Shocked',slowed:'Slowed',exposed:'Exposed',fortified:'Fortified',evasive:'Evasive'};
 function stat(stats:CombatStats|undefined,key:keyof CombatStats,fallback=55){return stats?Number(stats[key]||fallback):fallback}
-function combatJutsu(jutsu:JutsuTechnique[]|undefined){return (jutsu||[]).filter(x=>x.slot||x.masteryLevel>1).sort((a,b)=>b.masteryLevel-a.masteryLevel).slice(0,4)}
+function combatJutsu(jutsu:JutsuTechnique[]|undefined){const priority:Record<string,number>={ultimate:50,summoning:45,signature:35,advanced:25,standard:15};return (jutsu||[]).filter(x=>x.slot||x.masteryLevel>1).sort((a,b)=>(priority[b.slot||'']||0)+b.masteryLevel*2-((priority[a.slot||'']||0)+a.masteryLevel*2)).slice(0,8)}
+export function combatElement(value:unknown):CombatElement{
+  const text=String(value||'').toLowerCase();
+  if(text.includes('fire'))return'Fire';if(text.includes('water'))return'Water';if(text.includes('wind'))return'Wind';if(text.includes('lightning'))return'Lightning';if(text.includes('earth'))return'Earth';if(text.includes('wood'))return'Wood';if(text.includes('ice'))return'Ice';return'Neutral';
+}
+export function elementalMultiplier(attacking:unknown,defending:unknown){
+  const a=combatElement(attacking),d=combatElement(defending);if(a==='Neutral'||d==='Neutral'||a===d)return 1;if(ELEMENT_EDGE[a]===d)return 1.18;if(ELEMENT_EDGE[d]===a)return .86;return 1;
+}
+export function jutsuCooldownRounds(rank:string){return RANK_COOLDOWN[rank]||2}
+function status(kind:CombatStatusKind,turns=2,potency=1):CombatStatus{return{kind,label:STATUS_LABELS[kind],turns,potency}}
+function mergeStatus(list:CombatStatus[],next:CombatStatus){const found=list.find(item=>item.kind===next.kind);return found?list.map(item=>item.kind===next.kind?{...item,turns:Math.max(item.turns,next.turns),potency:Math.max(item.potency,next.potency)}:item):[...list,next]}
+function decayStatuses(list:CombatStatus[]){return list.map(item=>({...item,turns:item.turns-1})).filter(item=>item.turns>0)}
+function hasStatus(list:CombatStatus[],kind:CombatStatusKind){return list.some(item=>item.kind===kind)}
+function damageOverTime(list:CombatStatus[]){return list.reduce((sum,item)=>sum+(item.kind==='burn'?Math.max(3,Math.round(4*item.potency)):0),0)}
+function incomingModifier(list:CombatStatus[]){return (hasStatus(list,'exposed')?1.12:1)*(hasStatus(list,'fortified') ? 0.82 : 1)}
+function elementStatus(element:CombatElement,power=1):CombatStatus|null{if(element==='Fire')return status('burn',2,power);if(element==='Water')return status('soaked',2,power);if(element==='Lightning')return status('shocked',2,power);if(element==='Wind')return status('exposed',2,power);if(element==='Earth'||element==='Ice')return status('slowed',2,power);return null}
+function equipmentAction(item:EquipmentInventoryItem){
+  const actions:Record<string,{label:string;detail:string;kind:'damage'|'heal'|'status'|'control';value:number;status?:CombatStatusKind}>={
+    'chakra-blade':{label:'Chakra Blade Release',detail:'Elemental weapon burst · 10 chakra',kind:'damage',value:18},
+    'weighted-wraps':{label:'Release Weights',detail:'Explosive taijutsu burst',kind:'damage',value:16},
+    'reinforced-vest':{label:'Brace Armor',detail:'Fortified for 3 turns',kind:'status',value:3,status:'fortified'},
+    'sealing-scroll':{label:'Binding Seal',detail:'Damage + chakra drain + slow',kind:'control',value:15,status:'slowed'},
+    'smoke-kit':{label:'Smoke Screen',detail:'Evasive for 3 turns',kind:'status',value:3,status:'evasive'},
+    'wire-launcher':{label:'Wire Bind',detail:'Expose and slow the target',kind:'control',value:10,status:'slowed'},
+    'sensor-band':{label:'Read Opponent',detail:'Expose target + build ultimate',kind:'control',value:0,status:'exposed'},
+    'medical-pouch':{label:'Field Treatment',detail:'Restore 28 HP',kind:'heal',value:28},
+  };return actions[item.item_id]||null;
+}
+function hitRoll(chance:number){return Math.random()*100<clamp(chance,32,98)}
 
-export function CombatEncounter({title,opponent,stats,jutsu,difficulty=70,onComplete,onCancel}:{title:string;opponent:CombatOpponent;stats?:CombatStats;jutsu?:JutsuTechnique[];difficulty?:number;onComplete:(result:CombatResult)=>void|Promise<void>;onCancel:()=>void}){
-  const techniques=useMemo(()=>combatJutsu(jutsu),[jutsu]);
-  const playerMaxHp=clamp(Math.round(100+(stat(stats,'stamina')-50)*.35),92,126);
-  const playerMaxChakra=clamp(Math.round(100+(stat(stats,'chakraControl')-50)*.22),92,122);
+type CombatEncounterProps={title:string;opponent:CombatOpponent;stats?:CombatStats;jutsu?:JutsuTechnique[];equipment?:EquipmentInventoryItem[];summon?:string;playerElement?:string;difficulty?:number;onComplete:(result:CombatResult)=>void|Promise<void>;onCancel:()=>void};
+
+export function CombatEncounter({title,opponent,stats,jutsu,equipment=[],summon,playerElement,difficulty=70,onComplete,onCancel}:CombatEncounterProps){
+  const allTechniques=useMemo(()=>combatJutsu(jutsu),[jutsu]);
+  const ultimate=allTechniques.find(item=>item.slot==='ultimate')||null;
+  const techniques=allTechniques.filter(item=>item.slot!=='ultimate'&&item.slot!=='summoning').slice(0,4);
+  const summoningTechnique=allTechniques.find(item=>item.slot==='summoning')||null;
+  const equipped=useMemo(()=>equipment.filter(item=>item.equipped&&equipmentAction(item)),[equipment]);
+  const naturalElement=combatElement(playerElement||ultimate?.chakraNature||techniques[0]?.chakraNature);
+  const enemyElement=combatElement(opponent.element||opponent.technique);
+  const summonName=(summon||summoningTechnique?.name||'').trim();
+  const playerMaxHp=clamp(Math.round(100+(stat(stats,'stamina')-50)*.42),92,138);
+  const playerMaxChakra=clamp(Math.round(100+(stat(stats,'chakraControl')-50)*.3),92,132);
   const enemyMaxHp=Math.max(70,Math.round(opponent.hp||100));
   const enemyMaxChakra=Math.max(70,Math.round(opponent.chakra||100));
   const [hp,setHp]=useState(playerMaxHp);const [enemyHp,setEnemyHp]=useState(enemyMaxHp);const [chakra,setChakra]=useState(playerMaxChakra);const [enemyChakra,setEnemyChakra]=useState(enemyMaxChakra);
-  const [round,setRound]=useState(1);const [log,setLog]=useState<string[]>([`${opponent.name} enters the field.`]);const [finished,setFinished]=useState(false);const [busy,setBusy]=useState(false);
+  const [round,setRound]=useState(1);const [log,setLog]=useState<string[]>([`${opponent.name} enters the field${enemyElement!=='Neutral'?` with ${enemyElement} chakra`:''}.`]);const [finished,setFinished]=useState(false);const [busy,setBusy]=useState(false);
+  const [playerStatuses,setPlayerStatuses]=useState<CombatStatus[]>([]);const [enemyStatuses,setEnemyStatuses]=useState<CombatStatus[]>([]);const [cooldowns,setCooldowns]=useState<Record<string,number>>({});
+  const [equipmentUsed,setEquipmentUsed]=useState<Record<string,boolean>>({});const [summonTurns,setSummonTurns]=useState(0);const [summonUsed,setSummonUsed]=useState(false);const [ultimateCharge,setUltimateCharge]=useState(0);const [ultimateUsed,setUltimateUsed]=useState(false);const [enemyPhase,setEnemyPhase]=useState(1);const [statusCount,setStatusCount]=useState(0);
+  const [impact,setImpact]=useState<{side:'player'|'enemy';kind:'hit'|'heal'|'miss'|'status';text:string}|null>(null);
   const playerPower=(stat(stats,'taijutsu')+stat(stats,'ninjutsu')+stat(stats,'speed')+stat(stats,'chakraControl')+stat(stats,'adaptability'))/5;
-  const enemyPower=clamp(opponent.power+difficulty*.18,42,108);
-  const append=(line:string)=>setLog(v=>[line,...v].slice(0,10));
-  const resolveEnemy=(guarding:boolean,currentHp:number,currentEnemyHp:number,currentEnemyChakra:number)=>{
-    if(currentEnemyHp<=0){setFinished(true);setBusy(false);return;}
+  const baseEnemyPower=clamp(opponent.power+difficulty*.18,42,108);
+  const append=(line:string)=>setLog(v=>[line,...v].slice(0,14));
+  const flash=(side:'player'|'enemy',kind:'hit'|'heal'|'miss'|'status',text:string)=>{setImpact({side,kind,text});window.setTimeout(()=>setImpact(null),520)};
+  const addEnemyStatus=(list:CombatStatus[],next:CombatStatus|null)=>{if(!next)return list;setStatusCount(v=>v+1);return mergeStatus(list,next)};
+  const addPlayerStatus=(list:CombatStatus[],next:CombatStatus|null)=>{if(!next)return list;return mergeStatus(list,next)};
+  const decayCooldowns=(preserveId?:string)=>setCooldowns(prev=>Object.fromEntries(Object.entries(prev).map(([id,value])=>[id,id===preserveId?value:Math.max(0,value-1)])));
+  const phaseFor=(currentEnemyHp:number)=>!opponent.boss?1:currentEnemyHp/enemyMaxHp<=.35?3:currentEnemyHp/enemyMaxHp<=.7?2:1;
+
+  const resolveEnemy=(guarding:boolean,currentHp:number,currentEnemyHp:number,currentEnemyChakra:number,currentPlayerStatuses:CombatStatus[],currentEnemyStatuses:CombatStatus[],usedTechniqueId?:string,currentSummonTurns=summonTurns)=>{
+    let nextEnemyHp=currentEnemyHp;let nextHp=currentHp;let nextEnemyStatuses=currentEnemyStatuses;let nextPlayerStatuses=currentPlayerStatuses;
+    const enemyDot=damageOverTime(nextEnemyStatuses);if(enemyDot){nextEnemyHp=Math.max(0,nextEnemyHp-enemyDot);append(`${opponent.name} takes ${enemyDot} ongoing damage.`);flash('enemy','status',`-${enemyDot}`)}
+    if(nextEnemyHp<=0){setEnemyHp(0);setEnemyStatuses(decayStatuses(nextEnemyStatuses));setFinished(true);setBusy(false);return;}
+    const phase=phaseFor(nextEnemyHp);if(phase>enemyPhase){setEnemyPhase(phase);append(`${opponent.name} enters ${phase===2?'Phase II':'FINAL PHASE'} and changes tempo.`);flash('enemy','status',`PHASE ${phase}`)}
+    const phaseBoost=opponent.boss?(phase-1)*9:0;const enemyPower=clamp(baseEnemyPower+phaseBoost,42,125);
     const roll=Math.random();let damage=0;let text='';let nextEnemyChakra=currentEnemyChakra;
-    const jutsuChance = opponent.boss
-      ? 0.72
-      : opponent.affinity === 'control'
-        ? 0.68
-        : opponent.affinity === 'adaptive'
-          ? 0.48
-          : 0.36;
+    const jutsuChance=Math.min(.86,(opponent.boss ? .62 : opponent.affinity==='control' ? .58 : opponent.affinity==='adaptive' ? .44 : .34)+(phase-1)*.09);
     const usesJutsu=currentEnemyChakra>=22&&roll>1-jutsuChance;
-    if(usesJutsu){const cost=opponent.boss?28:22;damage=Math.round(9+enemyPower*.16+Math.random()*(opponent.boss?10:7));nextEnemyChakra=Math.max(0,currentEnemyChakra-cost);text=`${opponent.name} uses ${opponent.technique||'a chakra technique'} for ${damage} damage.`;}
-    else if(roll<.15){const gain=opponent.boss?22:18;nextEnemyChakra=Math.min(enemyMaxChakra,currentEnemyChakra+gain);text=`${opponent.name} creates distance and recovers ${gain} chakra.`;}
-    else{damage=Math.round(7+enemyPower*.13+Math.random()*(opponent.boss?8:6));text=`${opponent.name} attacks for ${damage} damage.`;}
-    let nextEnemyHp=currentEnemyHp;
-    if(guarding&&damage){const reduction=clamp(34+(stat(stats,'adaptability')-50)*.35,28,60);damage=Math.round(damage*(1-reduction/100));text+=` Guard reduces it to ${damage}.`;const counterChance=clamp((stat(stats,'speed')+stat(stats,'adaptability')-100)/180,.08,.46);if(Math.random()<counterChance){const counter=Math.round(5+stat(stats,'taijutsu')*.08);nextEnemyHp=Math.max(0,nextEnemyHp-counter);text+=` Counter lands for ${counter}.`;}}
-    const nextHp=Math.max(0,currentHp-damage);setHp(nextHp);setEnemyHp(nextEnemyHp);setEnemyChakra(nextEnemyChakra);setRound(v=>v+1);append(text);setBusy(false);
+    const playerEvasion=(hasStatus(nextPlayerStatuses,'evasive')?17:0)+(stat(stats,'speed')+stat(stats,'adaptability')-110)*.06;
+    const enemyAccuracy=82+enemyPower*.05-playerEvasion-(hasStatus(nextEnemyStatuses,'shocked')?12:0)-(hasStatus(nextEnemyStatuses,'slowed')?5:0);
+    if(usesJutsu){const cost=opponent.boss?28:22;nextEnemyChakra=Math.max(0,currentEnemyChakra-cost);if(hitRoll(enemyAccuracy+3)){const factor=elementalMultiplier(enemyElement,naturalElement)*(hasStatus(nextPlayerStatuses,'soaked')&&enemyElement==='Lightning'?1.18:1);damage=Math.round((9+enemyPower*.16+Math.random()*(opponent.boss?10:7))*factor*incomingModifier(nextPlayerStatuses));text=`${opponent.name} uses ${opponent.technique||'a chakra technique'} for ${damage} damage${factor>1.05?' — elemental advantage!':''}.`;const statusEffect=elementStatus(enemyElement,phase>=3?1.35:1);if(statusEffect&&Math.random()<(opponent.boss ? 0.55 : 0.38)){nextPlayerStatuses=addPlayerStatus(nextPlayerStatuses,statusEffect);text+=` ${statusEffect.label} applied.`;}}else{text=`${opponent.name}'s ${opponent.technique||'chakra technique'} misses.`;flash('player','miss','EVADE')}
+    }else if(roll<.14){const gain=opponent.boss?22:18;nextEnemyChakra=Math.min(enemyMaxChakra,currentEnemyChakra+gain);text=`${opponent.name} creates distance and recovers ${gain} chakra.`;flash('enemy','heal',`+${gain} CH`)}
+    else if(hitRoll(enemyAccuracy)){damage=Math.round((7+enemyPower*.13+Math.random()*(opponent.boss?8:6))*incomingModifier(nextPlayerStatuses));text=`${opponent.name} attacks for ${damage} damage.`;}else{text=`${opponent.name} attacks, but you evade.`;flash('player','miss','DODGE')}
+    if(guarding&&damage){const reduction=clamp(34+(stat(stats,'adaptability')-50)*.35,28,62);damage=Math.round(damage*(1-reduction/100));text+=` Guard reduces it to ${damage}.`;const counterChance=clamp((stat(stats,'speed')+stat(stats,'adaptability')-100)/180,.08,.5);if(Math.random()<counterChance){const counter=Math.round(5+stat(stats,'taijutsu')*.08);nextEnemyHp=Math.max(0,nextEnemyHp-counter);text+=` Counter lands for ${counter}.`;flash('enemy','hit',`-${counter}`)}}
+    if(currentSummonTurns>0&&damage){damage=Math.round(damage*.88);text+=` ${summonName||'Your summon'} absorbs part of the pressure.`;}
+    nextHp=Math.max(0,nextHp-damage);if(damage){flash('player','hit',`-${damage}`);setUltimateCharge(v=>clamp(v+10+damage*.55))}
+    const playerDot=damageOverTime(nextPlayerStatuses);if(playerDot){nextHp=Math.max(0,nextHp-playerDot);text+=` Ongoing effects deal ${playerDot} more.`;}
+    nextEnemyStatuses=decayStatuses(nextEnemyStatuses);nextPlayerStatuses=decayStatuses(nextPlayerStatuses);
+    setHp(nextHp);setEnemyHp(nextEnemyHp);setEnemyChakra(nextEnemyChakra);setEnemyStatuses(nextEnemyStatuses);setPlayerStatuses(nextPlayerStatuses);setRound(v=>v+1);setSummonTurns(v=>Math.max(0,v-1));decayCooldowns(usedTechniqueId);append(text);setBusy(false);
     if(nextHp<=0||nextEnemyHp<=0)setFinished(true);
   };
-  const act=(type:'strike'|'guard'|'focus'|'feint'|'jutsu',technique?:JutsuTechnique)=>{
-    if(busy||finished||hp<=0||enemyHp<=0)return;setBusy(true);let damage=0;let nextChakra=chakra;let nextEnemyChakra=enemyChakra;let guarding=false;let text='';
-    if(type==='strike'){damage=Math.round(7+(stat(stats,'taijutsu')+stat(stats,'strength'))*.07+Math.random()*7);nextChakra=Math.min(playerMaxChakra,chakra+6);text=`You land a close-range strike for ${damage}.`;}
-    if(type==='guard'){guarding=true;nextChakra=Math.min(playerMaxChakra,chakra+10);text='You settle into a guarded counter stance.';}
-    if(type==='focus'){const gain=Math.round(17+stat(stats,'chakraControl')*.08);nextChakra=Math.min(playerMaxChakra,chakra+gain);text=`You mold chakra and recover ${gain}.`;}
-    if(type==='feint'){const cost=16;if(chakra<cost){append('Not enough chakra to shape the feint.');setBusy(false);return;}nextChakra=Math.max(0,chakra-cost);nextEnemyChakra=Math.max(0,enemyChakra-8);damage=Math.round(5+(stat(stats,'genjutsu')+stat(stats,'intelligence'))*.065+Math.random()*6);text=`You break ${opponent.name}'s read with a feint for ${damage} damage and disrupt 8 chakra.`;}
-    if(type==='jutsu'&&technique){const cost=JUTSU_COST[technique.chakraCost]||22;if(chakra<cost){append(`Not enough chakra for ${technique.name}.`);setBusy(false);return;}nextChakra=Math.max(0,chakra-cost);const mastery=1+(technique.masteryLevel-1)*.1;damage=Math.round((RANK_POWER[technique.rank]||16)+(stat(stats,'ninjutsu')+stat(stats,'chakraControl'))*.09*mastery+Math.random()*8);if(technique.role.toLowerCase().includes('control')){damage+=3;nextEnemyChakra=Math.max(0,nextEnemyChakra-5)}text=`${technique.name} hits for ${damage}.`;}
-    const nextEnemy=Math.max(0,enemyHp-damage);setEnemyHp(nextEnemy);setChakra(nextChakra);setEnemyChakra(nextEnemyChakra);append(text);if(nextEnemy<=0){setFinished(true);setBusy(false);return;}window.setTimeout(()=>resolveEnemy(guarding,hp,nextEnemy,nextEnemyChakra),220);
+
+  const finishPlayerTurn=(text:string,damage:number,nextChakra:number,nextEnemyChakra:number,guarding=false,nextPlayerStatuses=playerStatuses,nextEnemyStatuses=enemyStatuses,usedTechniqueId?:string,nextSummonTurns=summonTurns,currentPlayerHp=hp)=>{
+    let totalDamage=damage;let updatedEnemyStatuses=nextEnemyStatuses;
+    if(summonTurns>0&&damage>=0){const assist=Math.round(5+stat(stats,'adaptability')*.06+Math.random()*4);totalDamage+=assist;text+=` ${summonName||'Your summon'} follows with ${assist} assist damage.`;}
+    const nextEnemy=Math.max(0,enemyHp-totalDamage);setEnemyHp(nextEnemy);setChakra(nextChakra);setEnemyChakra(nextEnemyChakra);setPlayerStatuses(nextPlayerStatuses);setEnemyStatuses(updatedEnemyStatuses);append(text);if(totalDamage>0)flash('enemy','hit',`-${totalDamage}`);
+    if(nextEnemy<=0){setFinished(true);setBusy(false);return;}window.setTimeout(()=>resolveEnemy(guarding,currentPlayerHp,nextEnemy,nextEnemyChakra,nextPlayerStatuses,updatedEnemyStatuses,usedTechniqueId,nextSummonTurns),260);
   };
-  const won=enemyHp<=0&&hp>0;const hpPct=hp/playerMaxHp*100;const chakraPct=chakra/playerMaxChakra*100;const score=clamp(Math.round((won?55:18)+hpPct*.24+chakraPct*.08-Math.max(0,round-9)*1.8+(playerPower-enemyPower)*.32));
-  return <div className="activity-overlay" role="dialog" aria-modal="true"><div className={`activity-panel combat-encounter ${opponent.boss?'boss':''}`}><div className="activity-head"><div><span className="eyebrow">{opponent.boss?'BOSS ENCOUNTER':'TACTICAL COMBAT'}</span><h3>{title}</h3><p>{opponent.name} · {opponent.style} — {opponent.detail}</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="combat-hud"><div><span>YOU · HP {hp}/{playerMaxHp}</span><div className="combat-bar hp"><i style={{width:`${hp/playerMaxHp*100}%`}}/></div><span>CHAKRA {chakra}/{playerMaxChakra}</span><div className="combat-bar chakra"><i style={{width:`${chakra/playerMaxChakra*100}%`}}/></div></div><b>ROUND {round}</b><div><span>{opponent.name} · HP {enemyHp}/{enemyMaxHp}</span><div className="combat-bar enemy"><i style={{width:`${enemyHp/enemyMaxHp*100}%`}}/></div><span>CHAKRA {enemyChakra}/{enemyMaxChakra}</span><div className="combat-bar chakra"><i style={{width:`${enemyChakra/enemyMaxChakra*100}%`}}/></div></div></div>{!finished?<><div className="combat-actions"><button disabled={busy} onClick={()=>act('strike')}><strong>Strike</strong><small>Reliable · +6 chakra</small></button><button disabled={busy} onClick={()=>act('guard')}><strong>Guard / Counter</strong><small>Reduce damage · counter chance</small></button><button disabled={busy} onClick={()=>act('focus')}><strong>Focus Chakra</strong><small>Recover chakra · vulnerable</small></button><button disabled={busy||chakra<16} onClick={()=>act('feint')}><strong>Feint / Genjutsu</strong><small>16 chakra · disrupt enemy chakra</small></button></div><div className="combat-jutsu"><span className="eyebrow">JUTSU LOADOUT</span>{techniques.length?<div>{techniques.map(t=>{const cost=JUTSU_COST[t.chakraCost]||22;return <button key={t.id} disabled={busy||chakra<cost} onClick={()=>act('jutsu',t)}><strong>{t.name}</strong><span>{t.rank}-Rank · Mastery Lv {t.masteryLevel}</span><small>{cost} chakra · {t.role}</small></button>})}</div>:<p className="muted">No trained/loadout jutsu available. Win through fundamentals, feints, and chakra control or develop your Arsenal first.</p>}</div></>:<div className={`activity-result ${won?'passed':'failed'}`}><span className="eyebrow">BATTLE RESULT</span><strong>{score}</strong><h3>{won?'Victory':'Defeat'}</h3><p className="muted">{hp}/{playerMaxHp} HP · {chakra}/{playerMaxChakra} chakra · {round} rounds</p><button className="btn primary" onClick={()=>void onComplete({score,won,rounds:round,hp,chakra})}>{won?'Claim Victory':'Record Defeat'}</button></div>}<div className="combat-log">{log.map((line,index)=><p key={`${line}-${index}`}>{line}</p>)}</div></div></div>;
+
+  const act=(type:'strike'|'guard'|'focus'|'feint'|'jutsu'|'ultimate'|'summon',technique?:JutsuTechnique)=>{
+    if(busy||finished||hp<=0||enemyHp<=0)return;setBusy(true);let damage=0;let nextChakra=chakra;let nextEnemyChakra=enemyChakra;let guarding=false;let text='';let nextEnemyStatuses=[...enemyStatuses];let nextPlayerStatuses=[...playerStatuses];let usedTechniqueId:string|undefined;
+    const enemyEvasion=(opponent.affinity==='adaptive'?7:opponent.affinity==='control'?4:1)+(hasStatus(enemyStatuses,'evasive')?15:0)-(hasStatus(enemyStatuses,'slowed')?10:0);
+    if(type==='strike'){const accuracy=84+(stat(stats,'speed')-baseEnemyPower)*.12-enemyEvasion;if(hitRoll(accuracy)){damage=Math.round((7+(stat(stats,'taijutsu')+stat(stats,'strength'))*.07+Math.random()*7)*incomingModifier(enemyStatuses));text=`You land a close-range strike for ${damage}.`;setUltimateCharge(v=>clamp(v+12))}else{text='Your strike misses as the opponent slips the line.';flash('enemy','miss','MISS')}nextChakra=Math.min(playerMaxChakra,chakra+6);}
+    if(type==='guard'){guarding=true;nextChakra=Math.min(playerMaxChakra,chakra+10);nextPlayerStatuses=mergeStatus(nextPlayerStatuses,status('fortified',1,1));text='You settle into a guarded counter stance.';setUltimateCharge(v=>clamp(v+10));}
+    if(type==='focus'){const gain=Math.round(17+stat(stats,'chakraControl')*.08);nextChakra=Math.min(playerMaxChakra,chakra+gain);text=`You mold chakra and recover ${gain}.`;flash('player','heal',`+${gain} CH`);}
+    if(type==='feint'){const cost=16;if(chakra<cost){append('Not enough chakra to shape the feint.');setBusy(false);return;}nextChakra=Math.max(0,chakra-cost);nextEnemyChakra=Math.max(0,enemyChakra-8);const accuracy=89+(stat(stats,'intelligence')-baseEnemyPower)*.1-enemyEvasion;if(hitRoll(accuracy)){damage=Math.round((5+(stat(stats,'genjutsu')+stat(stats,'intelligence'))*.065+Math.random()*6)*incomingModifier(enemyStatuses));nextEnemyStatuses=addEnemyStatus(nextEnemyStatuses,status('exposed',2,1));text=`You break ${opponent.name}'s read with a feint for ${damage} damage, disrupt 8 chakra, and expose their defense.`;}else{text='The feint is read and fails to create an opening.';flash('enemy','miss','READ')};}
+    if((type==='jutsu'||type==='ultimate')&&technique){const ultimateAttack=type==='ultimate';const cost=Math.max(JUTSU_COST[technique.chakraCost]||22,ultimateAttack?32:0);if(chakra<cost){append(`Not enough chakra for ${technique.name}.`);setBusy(false);return;}if(ultimateAttack&&(ultimateCharge<100||ultimateUsed)){append('Ultimate technique is not ready.');setBusy(false);return;}const remaining=cooldowns[technique.id]||0;if(!ultimateAttack&&remaining>0){append(`${technique.name} is cooling down for ${remaining} more round${remaining===1?'':'s'}.`);setBusy(false);return;}nextChakra=Math.max(0,chakra-cost);const mastery=1+(technique.masteryLevel-1)*.1;const element=combatElement(technique.chakraNature||naturalElement);const elementFactor=elementalMultiplier(element,enemyElement)*(hasStatus(enemyStatuses,'soaked')&&element==='Lightning'?1.22:1);const accuracy=(ultimateAttack?97:86)+(stat(stats,'chakraControl')-baseEnemyPower)*.1-enemyEvasion-(hasStatus(playerStatuses,'shocked')?12:0);if(hitRoll(accuracy)){const base=(RANK_POWER[technique.rank]||16)+(stat(stats,'ninjutsu')+stat(stats,'chakraControl'))*.09*mastery+Math.random()*8;damage=Math.round(base*elementFactor*(ultimateAttack?1.65:1)*incomingModifier(enemyStatuses));if(technique.role.toLowerCase().includes('control')){damage+=3;nextEnemyChakra=Math.max(0,nextEnemyChakra-5)}const effect=elementStatus(element,1+(technique.masteryLevel-1)*.12);if(effect&&(ultimateAttack||Math.random()<.38+technique.masteryLevel*.05)){nextEnemyStatuses=addEnemyStatus(nextEnemyStatuses,effect);text=`${technique.name} hits for ${damage}${elementFactor>1.05?' with elemental advantage':''} and applies ${effect.label}.`;}else text=`${technique.name} hits for ${damage}${elementFactor>1.05?' with elemental advantage':''}.`;if(element==='Earth')nextPlayerStatuses=mergeStatus(nextPlayerStatuses,status('fortified',2,1));}else{text=`${technique.name} misses as ${opponent.name} evades the technique.`;flash('enemy','miss','EVADE')}usedTechniqueId=technique.id;if(ultimateAttack){setUltimateUsed(true);setUltimateCharge(0)}else setCooldowns(prev=>({...prev,[technique.id]:jutsuCooldownRounds(technique.rank)}));}
+    if(type==='summon'){const cost=34;if(!summonName){append('No summoning contract or summoning technique is equipped.');setBusy(false);return;}if(summonUsed){append(`${summonName} has already answered this battle.`);setBusy(false);return;}if(chakra<cost){append(`You need ${cost} chakra to summon ${summonName}.`);setBusy(false);return;}nextChakra=chakra-cost;setSummonUsed(true);setSummonTurns(4);nextPlayerStatuses=mergeStatus(nextPlayerStatuses,status('evasive',2,1));text=`You summon ${summonName}. The companion will assist for the next 3 rounds and soften incoming attacks.`;flash('player','status','SUMMON');}
+    finishPlayerTurn(text,damage,nextChakra,nextEnemyChakra,guarding,nextPlayerStatuses,nextEnemyStatuses,usedTechniqueId,type==='summon'?4:summonTurns);
+  };
+
+  const useEquipment=(item:EquipmentInventoryItem)=>{
+    const action=equipmentAction(item);if(!action||busy||finished||equipmentUsed[item.id])return;setBusy(true);setEquipmentUsed(prev=>({...prev,[item.id]:true}));let damage=0;let nextHp=hp;let nextChakra=chakra;let nextEnemyChakra=enemyChakra;let nextPlayerStatuses=[...playerStatuses];let nextEnemyStatuses=[...enemyStatuses];let text=`${action.label}: `;
+    if(action.kind==='heal'){nextHp=Math.min(playerMaxHp,hp+action.value);setHp(nextHp);text+=`restore ${nextHp-hp} HP.`;flash('player','heal',`+${nextHp-hp}`)}
+    if(action.kind==='status'&&action.status){nextPlayerStatuses=mergeStatus(nextPlayerStatuses,status(action.status,action.value,1));text+=`${STATUS_LABELS[action.status]} for ${action.value} turns.`;flash('player','status',STATUS_LABELS[action.status])}
+    if(action.kind==='damage'){if(item.item_id==='chakra-blade'){if(chakra<10){append('Not enough chakra to release the Chakra Blade.');setEquipmentUsed(prev=>({...prev,[item.id]:false}));setBusy(false);return;}nextChakra-=10;const factor=elementalMultiplier(naturalElement,enemyElement);damage=Math.round((action.value+stat(stats,'strength')*.08+stat(stats,'ninjutsu')*.05)*factor);const effect=elementStatus(naturalElement,1);if(effect)nextEnemyStatuses=addEnemyStatus(nextEnemyStatuses,effect)}else damage=Math.round(action.value+stat(stats,'taijutsu')*.08);text+=`deal ${damage} damage.`;}
+    if(action.kind==='control'){damage=Math.round(action.value+stat(stats,'intelligence')*.04);nextEnemyChakra=Math.max(0,enemyChakra-(item.item_id==='sealing-scroll'?16:6));if(action.status)nextEnemyStatuses=addEnemyStatus(nextEnemyStatuses,status(action.status,2,1));if(item.item_id==='wire-launcher')nextEnemyStatuses=addEnemyStatus(nextEnemyStatuses,status('exposed',2,1));if(item.item_id==='sensor-band')setUltimateCharge(v=>clamp(v+22));text+=`${damage?`${damage} damage · `:''}disrupt the target.`;}
+    if(nextHp!==hp)setHp(nextHp);finishPlayerTurn(text,damage,nextChakra,nextEnemyChakra,false,nextPlayerStatuses,nextEnemyStatuses,undefined,summonTurns,nextHp);
+  };
+
+  const won=enemyHp<=0&&hp>0;const hpPct=hp/playerMaxHp*100;const chakraPct=chakra/playerMaxChakra*100;const score=clamp(Math.round((won?55:18)+hpPct*.24+chakraPct*.08-Math.max(0,round-10)*1.5+(playerPower-baseEnemyPower)*.3+(ultimateUsed?3:0)+(summonUsed?2:0)));
+  const phaseLabel=enemyPhase===1?'PHASE I':enemyPhase===2?'PHASE II':'FINAL PHASE';
+  return <div className="activity-overlay" role="dialog" aria-modal="true"><div className={`activity-panel combat-encounter advanced ${opponent.boss?'boss':''} phase-${enemyPhase}`}><div className="activity-head"><div><span className="eyebrow">{opponent.boss?`BOSS ENCOUNTER · ${phaseLabel}`:'ADVANCED TACTICAL COMBAT'}</span><h3>{title}</h3><p>{opponent.name} · {opponent.style} — {opponent.detail}</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div>
+    <div className="combat-affinity-strip"><span>YOUR NATURE <b>{naturalElement}</b></span><span className={elementalMultiplier(naturalElement,enemyElement)>1?'advantage':elementalMultiplier(naturalElement,enemyElement)<1?'disadvantage':''}>ELEMENT MATCHUP <b>{elementalMultiplier(naturalElement,enemyElement)>1?'ADVANTAGE':elementalMultiplier(naturalElement,enemyElement)<1?'DISADVANTAGE':'NEUTRAL'}</b></span><span>ENEMY NATURE <b>{enemyElement}</b></span></div>
+    <div className="combat-arena"><div className={`combat-avatar player ${impact?.side==='player'?impact.kind:''}`}><span>忍</span>{impact?.side==='player'&&<b>{impact.text}</b>}</div><div className="combat-versus">VS<small>{opponent.boss?phaseLabel:`ROUND ${round}`}</small></div><div className={`combat-avatar enemy ${impact?.side==='enemy'?impact.kind:''}`}>{opponent.portraitUrl?<img src={opponent.portraitUrl} alt=""/>:<span>敵</span>}{impact?.side==='enemy'&&<b>{impact.text}</b>}</div></div>
+    <div className="combat-hud"><div><span>YOU · HP {hp}/{playerMaxHp}</span><div className="combat-bar hp"><i style={{width:`${hp/playerMaxHp*100}%`}}/></div><span>CHAKRA {chakra}/{playerMaxChakra}</span><div className="combat-bar chakra"><i style={{width:`${chakra/playerMaxChakra*100}%`}}/></div><div className="combat-statuses">{playerStatuses.map(item=><span key={item.kind}>{item.label} · {item.turns}</span>)}{summonTurns>0&&<span>Summon · {Math.min(3,summonTurns)} turns</span>}</div></div><b>ROUND {round}</b><div><span>{opponent.name} · HP {enemyHp}/{enemyMaxHp}</span><div className="combat-bar enemy"><i style={{width:`${enemyHp/enemyMaxHp*100}%`}}/></div><span>CHAKRA {enemyChakra}/{enemyMaxChakra}</span><div className="combat-bar chakra"><i style={{width:`${enemyChakra/enemyMaxChakra*100}%`}}/></div><div className="combat-statuses enemy">{enemyStatuses.map(item=><span key={item.kind}>{item.label} · {item.turns}</span>)}{opponent.boss&&<span>{phaseLabel}</span>}</div></div></div>
+    {!finished?<><div className="ultimate-meter"><span>ULTIMATE CHARGE</span><div><i style={{width:`${ultimateCharge}%`}}/></div><strong>{Math.round(ultimateCharge)}%</strong></div><div className="combat-actions"><button disabled={busy} onClick={()=>act('strike')}><strong>Strike</strong><small>Accuracy + chakra gain</small></button><button disabled={busy} onClick={()=>act('guard')}><strong>Guard / Counter</strong><small>Fortify · counter chance</small></button><button disabled={busy} onClick={()=>act('focus')}><strong>Focus Chakra</strong><small>Recover chakra · advance cooldowns</small></button><button disabled={busy||chakra<16} onClick={()=>act('feint')}><strong>Feint / Genjutsu</strong><small>Expose · disrupt chakra</small></button></div>
+      <div className="combat-specials">{summonName&&<button disabled={busy||summonUsed||chakra<34} onClick={()=>act('summon')}><strong>Summon · {summonName}</strong><small>{summonUsed?'Already summoned':'34 chakra · 3-round support'}</small></button>}{ultimate&&<button className="ultimate-action" disabled={busy||ultimateUsed||ultimateCharge<100||chakra<Math.max(32,JUTSU_COST[ultimate.chakraCost]||22)} onClick={()=>act('ultimate',ultimate)}><strong>ULTIMATE · {ultimate.name}</strong><small>{ultimateUsed?'Expended':ultimateCharge<100?`Charge ${Math.round(ultimateCharge)}%`:`READY · ${ultimate.rank}-Rank`}</small></button>}</div>
+      <div className="combat-jutsu"><span className="eyebrow">JUTSU LOADOUT · COOLDOWNS ACTIVE</span>{techniques.length?<div>{techniques.map(t=>{const cost=JUTSU_COST[t.chakraCost]||22;const cd=cooldowns[t.id]||0;const nature=combatElement(t.chakraNature);const factor=elementalMultiplier(nature,enemyElement);return <button key={t.id} disabled={busy||chakra<cost||cd>0} onClick={()=>act('jutsu',t)}><strong>{t.name}</strong><span>{t.rank}-Rank · {nature} · Mastery Lv {t.masteryLevel}</span><small>{cd?`Cooldown ${cd}`:`${cost} chakra · ${t.role}`}{factor>1?' · ADVANTAGE':factor<1?' · RESISTED':''}</small></button>})}</div>:<p className="muted">No trained/loadout jutsu available. Win through fundamentals, equipment, summons, feints, and chakra control or develop your Arsenal first.</p>}</div>
+      {equipped.length>0&&<div className="combat-equipment"><span className="eyebrow">EQUIPMENT ACTIONS · ONCE PER BATTLE</span><div>{equipped.map(item=>{const action=equipmentAction(item)!;return <button key={item.id} disabled={busy||equipmentUsed[item.id]} onClick={()=>useEquipment(item)}><strong>{action.label}</strong><span>{item.item.name}</span><small>{equipmentUsed[item.id]?'USED':action.detail}</small></button>})}</div></div>}
+    </>:<div className={`activity-result ${won?'passed':'failed'}`}><span className="eyebrow">BATTLE RESULT</span><strong>{score}</strong><h3>{won?'Victory':'Defeat'}</h3><p className="muted">{hp}/{playerMaxHp} HP · {chakra}/{playerMaxChakra} chakra · {round} rounds · {statusCount} status effects applied</p><div className="activity-rounds"><span>Ultimate: {ultimateUsed?'Used':'Not used'}</span><span>Summon: {summonUsed?'Deployed':'Not deployed'}</span><span>Element: {naturalElement} vs {enemyElement}</span></div><button className="btn primary" onClick={()=>void onComplete({score,won,rounds:round,hp,chakra,ultimateUsed,summonUsed,statusesApplied:statusCount})}>{won?'Claim Victory':'Record Defeat'}</button></div>}
+    <div className="combat-log">{log.map((line,index)=><p key={`${line}-${index}`}>{line}</p>)}</div></div></div>;
 }
 
 const WRITTEN_QUESTIONS=[
@@ -302,17 +392,17 @@ const FOREST_CHOICES=[
   {name:'Scroll Encounter',prompt:'You locate the required scroll, but another team is approaching.',choices:[['Secure the scroll, create distance, and avoid unnecessary battle',100],['Set an ambush while keeping an escape route',78],['Stand in the open and wait',35]] as [string,number][]},
 ];
 const OPPONENTS=[
-  {name:'Ren Kurogane',style:'Pressure Fighter',detail:'Fast close-range pressure with strong counters.',kind:'training' as ActivityKind,mod:4,power:62,affinity:'pressure' as const},
-  {name:'Mika Shiosai',style:'Control Specialist',detail:'Patient spacing, traps, and chakra control.',kind:'mastery' as ActivityKind,mod:7,power:68,affinity:'control' as const},
-  {name:'Daichi Arashi',style:'Adaptive Tactician',detail:'Reads habits and changes tempo between exchanges.',kind:'exam' as ActivityKind,mod:10,power:74,affinity:'adaptive' as const},
+  {name:'Ren Kurogane',style:'Pressure Fighter',detail:'Fast close-range pressure with strong counters.',kind:'training' as ActivityKind,mod:4,power:62,affinity:'pressure' as const,element:'Fire'},
+  {name:'Mika Shiosai',style:'Control Specialist',detail:'Patient spacing, traps, and chakra control.',kind:'mastery' as ActivityKind,mod:7,power:68,affinity:'control' as const,element:'Water'},
+  {name:'Daichi Arashi',style:'Adaptive Tactician',detail:'Reads habits and changes tempo between exchanges.',kind:'exam' as ActivityKind,mod:10,power:74,affinity:'adaptive' as const,element:'Lightning'},
 ];
 
-export function ExamAdventure({stage,title,difficulty=60,combatStats,jutsu,onComplete,onCancel}:ExamAdventureProps){
+export function ExamAdventure({stage,title,difficulty=60,combatStats,jutsu,equipment,summon,playerElement,onComplete,onCancel}:ExamAdventureProps){
   const [phase,setPhase]=useState(0);const [scores,setScores]=useState<number[]>([]);const [segments,setSegments]=useState<string[]>([]);const [challenge,setChallenge]=useState<{kind:ActivityKind;label:string;difficulty:number}|null>(null);const [combat,setCombat]=useState<{label:string;opponent:(typeof OPPONENTS)[number];difficulty:number}|null>(null);const [finished,setFinished]=useState(false);
   const passMark=threshold(difficulty);const finalScore=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;
   const finish=(nextScores:number[],nextSegments:string[])=>{setScores(nextScores);setSegments(nextSegments);setFinished(true)};
   const add=(label:string,value:number)=>{const ns=[...scores,Math.round(clamp(value))];const nl=[...segments,label];setScores(ns);setSegments(nl);return [ns,nl] as const};
-  if(combat)return <CombatEncounter title={`${title} · ${combat.label}`} opponent={combat.opponent} stats={combatStats} jutsu={jutsu} difficulty={combat.difficulty} onCancel={()=>setCombat(null)} onComplete={(result)=>{const [ns,nl]=add(combat.label,result.score);setCombat(null);if(stage==='preliminaries'){finish(ns,nl);return;}if(stage==='finals'){if(phase===0&&result.won){setPhase(1);return;}finish(ns,nl);}}}/>;
+  if(combat)return <CombatEncounter title={`${title} · ${combat.label}`} opponent={combat.opponent} stats={combatStats} jutsu={jutsu} equipment={equipment} summon={summon} playerElement={playerElement} difficulty={combat.difficulty} onCancel={()=>setCombat(null)} onComplete={(result)=>{const [ns,nl]=add(combat.label,result.score);setCombat(null);if(stage==='preliminaries'){finish(ns,nl);return;}if(stage==='finals'){if(phase===0&&result.won){setPhase(1);return;}finish(ns,nl);}}}/>;
   if(challenge)return <ActivityChallenge kind={challenge.kind} title={`${title} · ${challenge.label}`} difficulty={challenge.difficulty} focus="Your execution determines whether you control this exam encounter." onCancel={()=>setChallenge(null)} onComplete={(result)=>{const [ns,nl]=add(challenge.label,result.score);setChallenge(null);if(stage==='survival')finish(ns,nl)}}/>;
   if(finished){const passed=finalScore>=passMark;return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">CHŪNIN EXAM EVENT</span><h3>{title}</h3><p>Stage debrief</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className={`activity-result ${passed?'passed':'failed'}`}><strong>{finalScore}</strong><h3>{passed?'Stage Cleared':'Stage Failed'}</h3><p className="muted">Interactive target: {Math.round(passMark)}. The official server evaluation still controls advancement, qualification, and rewards.</p><div className="activity-rounds">{segments.map((label,index)=><span key={`${label}-${index}`}>{label}: {scores[index]??0}</span>)}</div><button className="btn primary" onClick={()=>void onComplete({score:finalScore,passed,segments,segmentScores:scores})}>{passed?'Submit Stage for Official Evaluation':'Record Failed Attempt'}</button></div></div></div>}
   if(stage==='tactical'){const q=WRITTEN_QUESTIONS[phase%WRITTEN_QUESTIONS.length];const answer=(index:number)=>{const value=index===q.best?100:index===((q.best+1)%q.choices.length)?60:25;const [ns,nl]=add(`Question ${phase+1}`,value);if(phase>=2)finish(ns,nl);else setPhase(v=>v+1)};return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">WRITTEN EXAM · QUESTION {phase+1}/3</span><h3>{title}</h3><p>Judgment matters more than speed.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-event-progress"><i style={{width:`${phase/3*100}%`}}/></div><div className="activity-stage"><h4>{q.q}</h4><div className="tactic-options">{q.choices.map((choice,index)=><button className="btn secondary" key={choice} onClick={()=>answer(index)}>{choice}</button>)}</div></div></div></div>}

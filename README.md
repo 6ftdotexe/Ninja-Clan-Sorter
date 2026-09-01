@@ -1,6 +1,13 @@
 # Shinobi Identity Archive — V11
 
 
+## V11.5.6 — Advanced Combat Depth
+
+V11.5.6 deepens the shared tactical-combat layer with elemental matchups, status effects, jutsu cooldowns, accuracy/evasion, one-use equipment actions, summoning support, charged ultimate techniques, multi-phase bosses, and stronger visual battle feedback. Existing mission, exam, rival, matchup, world-event, and Bingo Book encounters all inherit the upgraded engine.
+
+This is an application-only gameplay update. It continues to run against the V11.4.0 Supabase schema, so no database migration is required when upgrading from V11.4.0 or any V11.5.x build.
+
+
 ## V11.5.5 — Combat Expansion
 
 V11.5.5 turns tactical combat into a shared gameplay system instead of an exam-only mechanic. Mission objectives now include live encounters, rivalries and Matchup Lab can be fought directly, combat-heavy world events become boss battles, and public Bingo Book targets can be hunted interactively. Player builds still combine identity stats, training, equipment, and mastered jutsu.

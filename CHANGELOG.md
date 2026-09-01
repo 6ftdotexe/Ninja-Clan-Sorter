@@ -1,5 +1,22 @@
 # Changelog
 
+
+## V11.5.6 — Advanced Combat Depth
+
+- Added Fire/Water/Wind/Lightning/Earth elemental advantage and resistance interactions.
+- Added combat status effects: Burning, Soaked, Shocked, Slowed, Exposed, Fortified, and Evasive.
+- Added jutsu cooldowns scaled by technique rank.
+- Added accuracy/evasion checks for strikes, genjutsu, jutsu, and enemy attacks.
+- Added equipped-item combat actions with once-per-battle utility and recovery effects.
+- Added summon deployment with three-round assist and damage-mitigation support.
+- Added charged Ultimate techniques using the existing `ultimate` jutsu loadout slot.
+- Added ultimate charge generation from combat pressure and tactical actions.
+- Added boss Phase II / Final Phase behavior with increased pressure and technique usage.
+- Added elemental/status combat HUD, impact feedback, battle arena effects, and ultimate meter.
+- Routed equipment, summoning contract, and primary chakra into mission, exam, rival, matchup, world-event, and Bingo Book combat.
+- Added regression coverage for elemental matchups and jutsu cooldown scaling.
+- No Supabase schema change; expected schema remains V11.4.0.
+
 ## V11.5.5 — Combat Expansion
 
 - Expanded tactical combat beyond Chūnin Exams.

@@ -1,6 +1,7 @@
 import {describe,expect,it} from 'vitest';
 import {applyInteractiveBattleResult,characterCombatant} from '../../features/social';
 import {effectiveCombatStats} from '../../features/training';
+import {combatElement,elementalMultiplier,jutsuCooldownRounds} from '../../lib/minigames';
 import type {EquipmentInventoryItem,ShinobiCharacter,TrainingProfile} from '../../types';
 
 function character(id:string,name:string,chakra='Fire'):ShinobiCharacter{
@@ -34,4 +35,19 @@ describe('interactive combat integration',()=>{
     expect(effective.ninjutsu).toBe(base.ninjutsu+8);
     expect(effective.speed).toBe(base.speed+3);
   });
+
+  it('applies the five-nature elemental advantage cycle',()=>{
+    expect(elementalMultiplier('Fire','Wind')).toBeGreaterThan(1);
+    expect(elementalMultiplier('Water','Fire')).toBeGreaterThan(1);
+    expect(elementalMultiplier('Wind','Fire')).toBeLessThan(1);
+    expect(elementalMultiplier('Earth','Earth')).toBe(1);
+    expect(combatElement('Lightning + Wind')).toBe('Wind');
+  });
+
+  it('scales jutsu cooldowns by rank',()=>{
+    expect(jutsuCooldownRounds('D')).toBe(1);
+    expect(jutsuCooldownRounds('B')).toBe(2);
+    expect(jutsuCooldownRounds('S')).toBe(4);
+  });
+
 });
