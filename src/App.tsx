@@ -24,11 +24,13 @@ const TeamsPage=lazy(()=>import('./pages/SocialPages').then(m=>({default:m.Teams
 const VillagesPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.VillagesPage})));
 const VillagePage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.VillagePage})));
 const CareerPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.CareerPage})));
+const TrainingPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.TrainingPage})));
 
 const mainNav = [
   ['/discover','Discover'],
   ['/villages','Villages'],
   ['/career','Career'],
+  ['/training','Training'],
   ['/arsenal','Arsenal'],
   ['/missions','Missions'],
   ['/teams','Teams'],
@@ -62,12 +64,12 @@ export function Layout(){
       </button>
       <div className="brand-actions">
         {mainNav.map(([path,label])=><button className="nav-chip" key={path} onClick={()=>navigate(path)}>{label}</button>)}
-        <span className="edition">V11 · PHASE 1</span>
+        <span className="edition">V11 · PHASE 2</span>
         {configured&&<button className="account-chip" onClick={()=>navigate(user?'/account':'/login')}>{user?'My Account':'Sign In'}</button>}
       </div>
     </header>
     <section className="card route-stage"><RouteErrorBoundary><Suspense fallback={<RouteFallback/>}><Outlet/></Suspense></RouteErrorBoundary></section>
-    <footer>Unofficial fan-made personality experience. React + TypeScript · V{__APP_VERSION__} · Identity, living villages, career progression, combat, missions, social systems, and chronicle.</footer>
+    <footer>Unofficial fan-made personality experience. React + TypeScript · V{__APP_VERSION__} · Identity, living villages, training, jutsu mastery, equipment, career progression, missions, social systems, and chronicle.</footer>
   </main>;
 }
 
@@ -86,6 +88,7 @@ export default function App(){
     <Route path="/villages" element={<VillagesPage/>}/>
     <Route path="/villages/:villageId" element={<VillagePage/>}/>
     <Route path="/career" element={<CareerPage/>}/>
+    <Route path="/training" element={<TrainingPage/>}/>
     <Route path="/arsenal" element={<ArsenalPage/>}/>
     <Route path="/missions" element={<MissionsPage/>}/>
     <Route path="/teams" element={<TeamsPage/>}/>

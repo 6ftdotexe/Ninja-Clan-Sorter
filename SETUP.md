@@ -45,6 +45,19 @@ npm run check
 ---
 
 
+
+## V11.1.0 Phase 2 schema upgrade
+
+Phase 2 adds Training Points, ryō, permanent stat-training bonuses, jutsu mastery columns, equipment inventory, and authoritative progression RPCs. Re-run the current:
+
+```text
+supabase/schema.sql
+```
+
+Apply the schema **before** deploying V11.1.0. Production startup expects schema version `11.1.0`. Existing characters, missions, village memberships, jutsu, payments, and public profiles are preserved.
+
+After deployment, verify `/api/version` reports application/frontend/server/schema version `11.1.0`.
+
 ## V11.0.0 schema upgrade
 
 V11 Phase 1 adds persistent village membership and career/world RPCs. Existing deployments upgrading from V10.5.x must re-run the current:
@@ -406,19 +419,19 @@ Then verify in production:
 
 The current release intentionally keeps one evolving database file at `supabase/schema.sql`, one setup guide (`SETUP.md`), and one release history (`CHANGELOG.md`). New releases should update these files instead of adding phase-specific equivalents.
 
-## Current production release — V11.0.0
+## Current production release — V11.1.0
 
-V10.5.x remains the stable historical baseline. V11.0.0 is the current feature release and requires the V11 schema because Living Villages adds persistent membership plus village/career RPCs.
+V10.5.x remains the stable historical baseline. V11.1.0 is the current feature release and requires the Phase 2 schema because training resources, jutsu mastery, and equipment add persistent progression data and RPCs.
 
 ### Required upgrade order
 
 1. Back up the current Supabase project/database.
 2. Run the current `supabase/schema.sql`.
-3. Confirm the live schema preflight reports `11.0.0`.
+3. Confirm the live schema preflight reports `11.1.0`.
 4. Run `npm install` and `npm run release:check`.
-5. Deploy the V11.0.0 application/server.
+5. Deploy the V11.1.0 application/server.
 6. Point the platform health check at `/api/health/ready`.
-7. Verify `/api/version` reports application/server/frontend/schema version `11.0.0`.
+7. Verify `/api/version` reports application/server/frontend/schema version `11.1.0`.
 8. Sign in, select a saved shinobi, join a village, and confirm `/career` reflects the membership.
 9. Complete a mission and confirm village reputation/mission totals update on the career and village pages.
 10. Publish a test shinobi and confirm its public profile shows the safe public career summary.
@@ -457,10 +470,10 @@ GET /api/version
 Expected release contract:
 
 ```text
-Application: 11.0.0
-Server:      11.0.0
-Frontend:    11.0.0
-Schema:      11.0.0
+Application: 11.1.0
+Server:      11.1.0
+Frontend:    11.1.0
+Schema:      11.1.0
 ```
 
 ### Diagnostics

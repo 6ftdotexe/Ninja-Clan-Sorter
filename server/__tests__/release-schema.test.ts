@@ -7,7 +7,7 @@ import { runPreflight } from '../preflight.js';
 describe('release contract', () => {
   it('keeps package.json aligned with the server release', async () => {
     await expect(verifyPackageVersion()).resolves.toBeUndefined();
-    expect(APP_VERSION).toBe('11.0.0');
+    expect(APP_VERSION).toBe('11.1.0');
   });
 
   it('ships the TypeScript runtime used by npm start as a production dependency', async () => {
@@ -16,8 +16,8 @@ describe('release contract', () => {
     expect(pkg.devDependencies?.tsx).toBeUndefined();
   });
 
-  it('allows the application release to advance without requiring an unchanged schema migration', () => {
-    expect(EXPECTED_SCHEMA_VERSION).toBe('11.0.0');
+  it('expects the Phase 2 schema version', () => {
+    expect(EXPECTED_SCHEMA_VERSION).toBe('11.1.0');
   });
 
   it('reports a matching frontend/server/schema release contract', async () => {
@@ -57,6 +57,16 @@ describe('Supabase security/schema contracts', () => {
       'create or replace function public.list_village_directory()',
       'create or replace function public.get_shinobi_career(',
       'create or replace function public.get_public_shinobi_career(',
+      'alter table public.shinobi_progression add column if not exists training_points',
+      'alter table public.shinobi_progression add column if not exists ryo',
+      'alter table public.jutsu_techniques add column if not exists mastery_level',
+      'create table if not exists public.shinobi_equipment',
+      'create or replace function public.get_shinobi_training(',
+      'create or replace function public.train_shinobi_stat(',
+      'create or replace function public.train_jutsu_mastery(',
+      'create or replace function public.purchase_shinobi_equipment(',
+      'create or replace function public.equip_shinobi_equipment(',
+      'grant update(slot) on public.jutsu_techniques to authenticated;',
     ];
     for (const contract of required) expect(sql.toLowerCase()).toContain(contract.toLowerCase());
   });

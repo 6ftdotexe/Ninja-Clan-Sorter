@@ -1,5 +1,20 @@
 # Changelog
 
+## V11.1.0 — Phase 2: Training, Jutsu Mastery & Equipment
+
+- Added mission-earned Training Points and ryō as persistent per-character progression resources.
+- Added `/training` with permanent stat specialization capped at +15 per stat.
+- Added jutsu mastery XP and mastery levels 1–5 for saved techniques.
+- Added a server-authoritative equipment catalog, inventory, purchases, and one-equipped-item-per-slot loadouts.
+- Added weapon, armor, tool, and accessory stat bonuses.
+- Extended Arsenal with mastery training, owned equipment, equip/stow controls, and a ryō catalog.
+- Extended mission previews to show Training Point and ryō rewards.
+- Hardened progression creation so new resource balances and training bonuses must start at zero.
+- Restricted direct browser updates to jutsu mastery while preserving loadout-slot updates.
+- Added authenticated RPCs for training, mastery, equipment purchase, inventory listing, and equip state.
+- Bumped application, frontend, server, and Supabase schema release to `11.1.0`.
+- V11.1.0 requires rerunning `supabase/schema.sql` before deployment.
+
 ## V11.0.0 — Phase 1: Living Villages + Career Records
 
 - Added persistent formal village membership for each owned shinobi across Konohagakure, Sunagakure, Kumogakure, Iwagakure, and Kirigakure.

@@ -3,6 +3,13 @@
 This document describes the current application only. Historical architecture changes belong in `CHANGELOG.md`; setup and deployment instructions belong in `SETUP.md`.
 
 
+
+## V11.1.0 — Phase 2 progression layer
+
+Phase 2 adds a server-authoritative build progression loop without splitting the project into many new modules. `src/features/training.ts` owns training resources, stat specialization, jutsu mastery, and equipment catalog/inventory operations. `WorldPages.tsx` adds the Training Grounds route while `SystemPages.tsx` extends Arsenal with mastery and gear.
+
+Mission completion remains the authoritative reward source. The Supabase completion RPC grants XP, reputation, training points, and ryō based only on mission rank. Stat training, jutsu mastery, equipment purchase, and equipment equip operations are security-definer RPCs that verify `auth.uid()` and character ownership. Browser clients cannot directly mutate mastery or spendable progression resources.
+
 ## V11.0.0 structure
 
 The runtime is intentionally organized around a small number of cohesive modules rather than one file per route or feature surface:

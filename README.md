@@ -1,12 +1,14 @@
-# Shinobi Identity Archive V11
+# Shinobi Identity Archive — V11
 
-V11 is the current major release of the Shinobi Identity Archive. Phase 1 begins the Living Shinobi World by adding persistent village membership and career records to the existing identity platform: a React + TypeScript shinobi identity platform with cloud accounts, multiple saved characters, advanced identity trials, paid AI character generation, public profiles, combat stats, jutsu, missions, progression, teams, rivalries, matchups, lore, timelines, and profile customization.
+V11 is the current major release of the Shinobi Identity Archive. Phase 2 turns the Living Shinobi World into a build-progression RPG layer: missions now fund training points and ryō, characters can permanently specialize stats, saved jutsu gain mastery levels, and equipment can be purchased and equipped per shinobi.
 
-## V11 Phase 1 — Living Villages + Career Records
+## V11 Phase 2 — Training + Jutsu Mastery + Equipment
 
-V11.0.0 adds five persistent village communities, village standings/rosters, formal per-character membership, and a career record that combines field rank, XP, mission outcomes, and village reputation. Existing V10 systems remain intact and now feed the new world layer.
+V11.1.0 builds directly on Phase 1 Living Villages and Career Records. Mission success now awards training points and ryō in addition to XP and village reputation. Training points improve permanent character stat bonuses or jutsu mastery, while ryō purchases field equipment with loadout bonuses.
 
-This release requires the V11.0.0 Supabase schema before deployment. Run `npm run release:check`, deploy schema-first, then verify `/api/health/ready` and `/api/version`.
+The new `/training` route manages stat specialization and resources. `/arsenal` now includes jutsu mastery and an equipment inventory/catalog. Existing V10/V11 identity, village, mission, social, public-profile, generation, and chronicle systems remain intact.
+
+This release requires the V11.1.0 Supabase schema before deployment. Run `npm run release:check`, apply `supabase/schema.sql` first, deploy the application, then verify `/api/health/ready` and `/api/version`.
 
 ## Documentation
 

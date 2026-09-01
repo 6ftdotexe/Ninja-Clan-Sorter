@@ -1523,7 +1523,243 @@ revoke all on function public.get_public_shinobi_career(text) from public;
 grant execute on function public.get_public_shinobi_career(text) to anon,authenticated;
 
 -- ============================================================================
--- Release metadata — V11.0.0+
+-- V11 Phase 2 · Training, jutsu mastery, and equipment progression
+-- ============================================================================
+alter table public.shinobi_progression add column if not exists training_points integer not null default 0 check (training_points>=0);
+alter table public.shinobi_progression add column if not exists ryo integer not null default 0 check (ryo>=0);
+alter table public.shinobi_progression add column if not exists training_bonuses jsonb not null default '{}'::jsonb;
+
+-- Browser-created progression rows must still begin at a true zero state now
+-- that Phase 2 adds spendable resources and permanent training bonuses.
+drop policy if exists "Users can create own progression" on public.shinobi_progression;
+create policy "Users can create own progression" on public.shinobi_progression for insert
+with check (
+  auth.uid()=user_id
+  and exists(select 1 from public.shinobi_characters c where c.id=character_id and c.user_id=auth.uid())
+  and xp=0 and level=1 and village_reputation=0 and completed_missions=0
+  and d_missions=0 and c_missions=0 and b_missions=0 and a_missions=0 and s_missions=0
+  and current_title='New Operative' and training_points=0 and ryo=0 and training_bonuses='{}'::jsonb
+);
+
+alter table public.jutsu_techniques add column if not exists mastery_xp integer not null default 0 check (mastery_xp>=0);
+alter table public.jutsu_techniques add column if not exists mastery_level integer not null default 1 check (mastery_level between 1 and 5);
+-- Mastery is server-authoritative. Browser clients may still change loadout slots.
+revoke update on public.jutsu_techniques from authenticated;
+grant update(slot) on public.jutsu_techniques to authenticated;
+
+create table if not exists public.shinobi_equipment (
+  id uuid primary key default gen_random_uuid(),
+  character_id uuid not null references public.shinobi_characters(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  item_id text not null,
+  slot text not null check(slot in ('weapon','armor','tool','accessory')),
+  equipped boolean not null default false,
+  acquired_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(character_id,item_id)
+);
+alter table public.shinobi_equipment enable row level security;
+create index if not exists shinobi_equipment_character_idx on public.shinobi_equipment(character_id,acquired_at desc);
+create unique index if not exists shinobi_equipment_one_equipped_per_slot_idx on public.shinobi_equipment(character_id,slot) where equipped=true;
+drop policy if exists "shinobi_equipment_select_own" on public.shinobi_equipment;
+create policy "shinobi_equipment_select_own" on public.shinobi_equipment for select using(auth.uid()=user_id);
+revoke insert,update,delete on public.shinobi_equipment from authenticated;
+
+create or replace function public.get_shinobi_training(p_character_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+stable
+as $$
+declare v public.shinobi_progression%rowtype;
+begin
+  if auth.uid() is null or not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=auth.uid()) then return null; end if;
+  select * into v from public.shinobi_progression where character_id=p_character_id and user_id=auth.uid();
+  return jsonb_build_object(
+    'character_id',p_character_id,
+    'training_points',coalesce(v.training_points,0),
+    'ryo',coalesce(v.ryo,0),
+    'bonuses',coalesce(v.training_bonuses,'{}'::jsonb)
+  );
+end;
+$$;
+revoke all on function public.get_shinobi_training(uuid) from public,anon;
+grant execute on function public.get_shinobi_training(uuid) to authenticated;
+
+create or replace function public.train_shinobi_stat(p_character_id uuid,p_stat text,p_sessions integer default 1)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  v public.shinobi_progression%rowtype;
+  current_bonus integer;
+  next_bonus integer;
+begin
+  if auth.uid() is null then raise exception 'Authentication required.'; end if;
+  if p_stat not in ('ninjutsu','taijutsu','genjutsu','intelligence','speed','strength','stamina','chakraControl','leadership','adaptability') then raise exception 'Unknown training stat.'; end if;
+  if p_sessions<1 or p_sessions>5 then raise exception 'Training sessions must be between 1 and 5.'; end if;
+  if not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=auth.uid()) then raise exception 'Character not found.'; end if;
+  insert into public.shinobi_progression(character_id,user_id) values(p_character_id,auth.uid()) on conflict(character_id) do nothing;
+  select * into v from public.shinobi_progression where character_id=p_character_id and user_id=auth.uid() for update;
+  if v.training_points<p_sessions then raise exception 'Not enough training points.'; end if;
+  current_bonus:=coalesce((v.training_bonuses->>p_stat)::integer,0);
+  next_bonus:=least(15,current_bonus+p_sessions);
+  if next_bonus=current_bonus then raise exception 'This stat has reached its training cap.'; end if;
+  update public.shinobi_progression set
+    training_points=training_points-(next_bonus-current_bonus),
+    training_bonuses=jsonb_set(coalesce(training_bonuses,'{}'::jsonb),array[p_stat],to_jsonb(next_bonus),true),
+    updated_at=now()
+  where character_id=p_character_id and user_id=auth.uid();
+  return public.get_shinobi_training(p_character_id);
+end;
+$$;
+revoke all on function public.train_shinobi_stat(uuid,text,integer) from public,anon;
+grant execute on function public.train_shinobi_stat(uuid,text,integer) to authenticated;
+
+create or replace function public.train_jutsu_mastery(p_jutsu_id uuid,p_sessions integer default 1)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  j public.jutsu_techniques%rowtype;
+  v public.shinobi_progression%rowtype;
+  cost integer;
+  next_xp integer;
+  next_level integer;
+begin
+  if auth.uid() is null then raise exception 'Authentication required.'; end if;
+  if p_sessions<1 or p_sessions>5 then raise exception 'Training sessions must be between 1 and 5.'; end if;
+  select * into j from public.jutsu_techniques where id=p_jutsu_id and user_id=auth.uid() for update;
+  if not found then raise exception 'Jutsu not found.'; end if;
+  if j.mastery_level>=5 then raise exception 'This technique is already mastered.'; end if;
+  insert into public.shinobi_progression(character_id,user_id) values(j.character_id,auth.uid()) on conflict(character_id) do nothing;
+  select * into v from public.shinobi_progression where character_id=j.character_id and user_id=auth.uid() for update;
+  cost:=p_sessions*2;
+  if v.training_points<cost then raise exception 'Not enough training points.'; end if;
+  next_xp:=least(400,j.mastery_xp+(p_sessions*25));
+  next_level:=least(5,1+floor(next_xp/100.0)::integer);
+  update public.jutsu_techniques set mastery_xp=next_xp,mastery_level=next_level where id=j.id;
+  update public.shinobi_progression set training_points=training_points-cost,updated_at=now() where character_id=j.character_id and user_id=auth.uid();
+  return jsonb_build_object('mastery_xp',next_xp,'mastery_level',next_level,'training_points',v.training_points-cost);
+end;
+$$;
+revoke all on function public.train_jutsu_mastery(uuid,integer) from public,anon;
+grant execute on function public.train_jutsu_mastery(uuid,integer) to authenticated;
+
+create or replace function public.list_shinobi_equipment(p_character_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+stable
+as $$
+begin
+  if auth.uid() is null or not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=auth.uid()) then return '[]'::jsonb; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('id',id,'user_id',user_id,'item_id',item_id,'slot',slot,'equipped',equipped,'acquired_at',acquired_at) order by acquired_at desc) from public.shinobi_equipment where character_id=p_character_id and user_id=auth.uid()),'[]'::jsonb);
+end;
+$$;
+revoke all on function public.list_shinobi_equipment(uuid) from public,anon;
+grant execute on function public.list_shinobi_equipment(uuid) to authenticated;
+
+create or replace function public.purchase_shinobi_equipment(p_character_id uuid,p_item_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  v_price integer;
+  v_slot text;
+  v_progress public.shinobi_progression%rowtype;
+  v_id uuid;
+begin
+  if auth.uid() is null or not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=auth.uid()) then raise exception 'Character not found.'; end if;
+  select price,slot into v_price,v_slot from (values
+    ('chakra-blade',350,'weapon'),('weighted-wraps',220,'armor'),('reinforced-vest',400,'armor'),('sealing-scroll',280,'tool'),
+    ('smoke-kit',120,'tool'),('wire-launcher',180,'tool'),('sensor-band',260,'accessory'),('medical-pouch',240,'accessory')
+  ) as catalog(item_id,price,slot) where item_id=p_item_id;
+  if v_price is null then raise exception 'Unknown equipment item.'; end if;
+  insert into public.shinobi_progression(character_id,user_id) values(p_character_id,auth.uid()) on conflict(character_id) do nothing;
+  select * into v_progress from public.shinobi_progression where character_id=p_character_id and user_id=auth.uid() for update;
+  if v_progress.ryo<v_price then raise exception 'Not enough ryō.'; end if;
+  if exists(select 1 from public.shinobi_equipment where character_id=p_character_id and item_id=p_item_id) then raise exception 'Equipment already owned.'; end if;
+  update public.shinobi_progression set ryo=ryo-v_price,updated_at=now() where character_id=p_character_id and user_id=auth.uid();
+  insert into public.shinobi_equipment(character_id,user_id,item_id,slot) values(p_character_id,auth.uid(),p_item_id,v_slot) returning id into v_id;
+  return jsonb_build_object('id',v_id,'ryo',v_progress.ryo-v_price);
+end;
+$$;
+revoke all on function public.purchase_shinobi_equipment(uuid,text) from public,anon;
+grant execute on function public.purchase_shinobi_equipment(uuid,text) to authenticated;
+
+create or replace function public.equip_shinobi_equipment(p_character_id uuid,p_inventory_id uuid,p_equipped boolean default true)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare e public.shinobi_equipment%rowtype;
+begin
+  if auth.uid() is null then raise exception 'Authentication required.'; end if;
+  select * into e from public.shinobi_equipment where id=p_inventory_id and character_id=p_character_id and user_id=auth.uid() for update;
+  if not found then raise exception 'Equipment not found.'; end if;
+  if p_equipped then update public.shinobi_equipment set equipped=false,updated_at=now() where character_id=p_character_id and user_id=auth.uid() and slot=e.slot and id<>e.id and equipped=true; end if;
+  update public.shinobi_equipment set equipped=p_equipped,updated_at=now() where id=e.id;
+  return jsonb_build_object('id',e.id,'equipped',p_equipped,'slot',e.slot);
+end;
+$$;
+revoke all on function public.equip_shinobi_equipment(uuid,uuid,boolean) from public,anon;
+grant execute on function public.equip_shinobi_equipment(uuid,uuid,boolean) to authenticated;
+
+-- Phase 2 mission rewards now fund training and equipment progression in addition
+-- to the existing XP/reputation career loop. All rewards remain rank-authoritative.
+create or replace function public.complete_shinobi_mission_v10(p_mission_id uuid,p_outcome text,p_success boolean)
+returns setof public.shinobi_progression
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  m public.shinobi_missions%rowtype;
+  reward_xp integer; reward_rep integer; reward_tp integer; reward_ryo integer;
+  applied_xp integer; new_xp bigint; new_rep integer; new_level integer; new_title text;
+begin
+  select * into m from public.shinobi_missions where id=p_mission_id and user_id=auth.uid() and status='accepted' for update;
+  if not found then raise exception 'Mission is not available for completion.'; end if;
+  reward_xp:=case m.rank when 'D' then 80 when 'C' then 150 when 'B' then 300 when 'A' then 550 when 'S' then 900 else 0 end;
+  reward_rep:=case m.rank when 'D' then 8 when 'C' then 14 when 'B' then 24 when 'A' then 40 when 'S' then 65 else 0 end;
+  reward_tp:=case m.rank when 'D' then 2 when 'C' then 3 when 'B' then 5 when 'A' then 8 when 'S' then 12 else 0 end;
+  reward_ryo:=case m.rank when 'D' then 60 when 'C' then 120 when 'B' then 240 when 'A' then 450 when 'S' then 800 else 0 end;
+  applied_xp:=case when p_success then reward_xp else greatest(10,floor(reward_xp*0.25)::integer) end;
+  insert into public.shinobi_progression(character_id,user_id) values(m.character_id,m.user_id) on conflict(character_id) do nothing;
+  select xp+applied_xp,village_reputation+case when p_success then reward_rep else 0 end into new_xp,new_rep from public.shinobi_progression where character_id=m.character_id and user_id=m.user_id for update;
+  new_level:=greatest(1,floor(sqrt(new_xp::numeric/70.0))::integer+1);
+  new_title:=case when new_rep>=900 then 'Village Legend' when new_rep>=600 then 'Village Pillar' when new_rep>=350 then 'Trusted Elite' when new_rep>=180 then 'Trusted Operative' when new_rep>=75 then 'Proven Shinobi' when new_rep>=25 then 'Reliable Genin' else 'New Operative' end;
+  update public.shinobi_progression set
+    xp=new_xp,level=new_level,village_reputation=new_rep,
+    training_points=training_points+case when p_success then reward_tp else 1 end,
+    ryo=ryo+case when p_success then reward_ryo else 0 end,
+    completed_missions=completed_missions+case when p_success then 1 else 0 end,
+    d_missions=d_missions+case when p_success and m.rank='D' then 1 else 0 end,
+    c_missions=c_missions+case when p_success and m.rank='C' then 1 else 0 end,
+    b_missions=b_missions+case when p_success and m.rank='B' then 1 else 0 end,
+    a_missions=a_missions+case when p_success and m.rank='A' then 1 else 0 end,
+    s_missions=s_missions+case when p_success and m.rank='S' then 1 else 0 end,
+    current_title=new_title,updated_at=now()
+  where character_id=m.character_id and user_id=m.user_id;
+  update public.shinobi_missions set status=case when p_success then 'completed' else 'failed' end,outcome=left(coalesce(p_outcome,''),2000),completed_at=now() where id=m.id;
+  return query select * from public.shinobi_progression where character_id=m.character_id and user_id=m.user_id;
+end;
+$$;
+revoke all on function public.complete_shinobi_mission_v10(uuid,text,boolean) from public;
+grant execute on function public.complete_shinobi_mission_v10(uuid,text,boolean) to authenticated;
+
+-- ============================================================================
+-- Release metadata — V11.1.0+
 -- The application uses this to verify that the deployed server and database
 -- schema were rolled out together before reporting readiness.
 -- ============================================================================
@@ -1536,7 +1772,7 @@ alter table public.app_release_metadata enable row level security;
 revoke all on public.app_release_metadata from public,anon,authenticated;
 
 insert into public.app_release_metadata(key,value,updated_at)
-values('schema_version','11.0.0',now())
+values('schema_version','11.1.0',now())
 on conflict(key) do update set value=excluded.value,updated_at=excluded.updated_at;
 
 create or replace function public.get_app_schema_version()

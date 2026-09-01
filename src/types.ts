@@ -22,17 +22,23 @@ export interface NormalizedShinobiProfile{
   name:string;characterId:string|null;clan:string;village:string;primaryChakra:string;secondaryChakra:string;advancedRelease:string;summon:string;mentor:string;shadow:string;fightingStyle:string;weaponAffinity:string;leadershipStyle:string;rankPotential:string;inheritedPotential:string;specialty:string;teamRole:string;completion:number;raw:Partial<Record<TestId,TestResult>>;
 }
 export interface JutsuTechnique{
-  id:string;character_id?:string;user_id?:string;name:string;rank:JutsuRank;type:string;chakraNature:string;range:string;role:string;chakraCost:string;description:string;strengths:string[];weaknesses:string[];requirements:string[];synergies:string[];slot:JutsuSlot|null;created_at?:string;
+  id:string;character_id?:string;user_id?:string;name:string;rank:JutsuRank;type:string;chakraNature:string;range:string;role:string;chakraCost:string;description:string;strengths:string[];weaknesses:string[];requirements:string[];synergies:string[];slot:JutsuSlot|null;masteryXp:number;masteryLevel:number;created_at?:string;
 }
+
+export type EquipmentSlot='weapon'|'armor'|'tool'|'accessory';
+export interface EquipmentCatalogItem{id:string;name:string;slot:EquipmentSlot;price:number;description:string;bonuses:Partial<Record<StatKey,number>>}
+export interface EquipmentInventoryItem{id:string;character_id:string;user_id:string;item_id:string;slot:EquipmentSlot;equipped:boolean;acquired_at:string;item:EquipmentCatalogItem}
+export interface TrainingProfile{character_id:string;training_points:number;ryo:number;bonuses:Partial<Record<StatKey,number>>;total_bonus:number}
+
 
 export type MissionRank='D'|'C'|'B'|'A'|'S';
 export type MissionStatus='offered'|'accepted'|'completed'|'failed'|'abandoned';
-export interface MissionRewards{xp:number;reputation:number;badge?:string|null}
+export interface MissionRewards{xp:number;reputation:number;trainingPoints?:number;ryo?:number;badge?:string|null}
 export interface ShinobiMission{
   id:string;user_id?:string;character_id?:string;title:string;rank:MissionRank;category:string;objective:string;briefing:string;location:string;recommended_traits:string[];rewards:MissionRewards;status:MissionStatus;outcome?:string|null;created_at?:string;accepted_at?:string|null;completed_at?:string|null;
 }
 export interface ShinobiProgression{
-  character_id:string;user_id:string;xp:number;level:number;village_reputation:number;completed_missions:number;d_missions:number;c_missions:number;b_missions:number;a_missions:number;s_missions:number;current_title:string;updated_at:string;
+  character_id:string;user_id:string;xp:number;level:number;village_reputation:number;training_points:number;ryo:number;training_bonuses:Partial<Record<StatKey,number>>;completed_missions:number;d_missions:number;c_missions:number;b_missions:number;a_missions:number;s_missions:number;current_title:string;updated_at:string;
 }
 export interface ProgressionAchievement{id:string;icon:string;label:string;description:string;earned:boolean}
 
