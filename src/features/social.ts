@@ -47,6 +47,28 @@ export function analyzeMatchup(left:SocialCombatant,right:SocialCombatant):Match
  const topR=(Object.entries(r) as [StatKey,number][]).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k])=>k.replace(/([A-Z])/g,' $1').toLowerCase());
  return {winnerId,winnerName,confidence,leftScore,rightScore,summary:winnerId?`${winnerName} holds the stronger projected matchup, but the result depends on controlling tempo and forcing the fight into favorable ranges.`:'The profiles are close enough that tactical choices and terrain are more important than raw ratings.',factors,counters,winConditions:{left:[`Lean on ${topL.join(' and ')}.`,`Force ${right.character.name} away from their strongest range.`,`Use ${left.character.chakra_primary||'chakra'} creatively to control tempo.`],right:[`Lean on ${topR.join(' and ')}.`,`Disrupt ${left.character.name}'s preferred rhythm.`,`Use ${right.character.chakra_primary||'chakra'} to create a favorable opening.`]}};
 }
+
+export function applyInteractiveBattleResult(left:ShinobiCharacter,right:ShinobiCharacter,playerId:string,result:{score:number;won:boolean;rounds:number;hp:number;chakra:number}):MatchupAnalysis{
+ const base=analyzeMatchup(characterCombatant(left),characterCombatant(right));
+ const opponentId=playerId===left.id?right.id:left.id;
+ const winnerId=result.won?playerId:opponentId;
+ const winnerName=winnerId===left.id?left.name:right.name;
+ const playerScore=Math.max(10,Math.min(100,Math.round(result.score)));
+ const opponentScore=Math.max(10,Math.min(100,Math.round(100-playerScore+(result.won?-6:8))));
+ const leftScore=playerId===left.id?playerScore:opponentScore;
+ const rightScore=playerId===right.id?playerScore:opponentScore;
+ return {
+  ...base,
+  winnerId,
+  winnerName,
+  confidence:Math.max(55,Math.min(96,Math.round(58+Math.abs(leftScore-rightScore)*.55))),
+  leftScore,
+  rightScore,
+  summary:`Interactive tactical battle: ${winnerName} won after ${result.rounds} rounds. The result reflects live player decisions layered over the profiles' derived combat strengths.`,
+  counters:[`Interactive battle · ${result.rounds} rounds · ${result.hp} HP · ${result.chakra} chakra`,...base.counters],
+ };
+}
+
 export function analyzeTeam(members:SocialCombatant[]):TeamAnalysis{
  if(!members.length)return {rating:0,cohesion:0,coverage:0,leadership:0,strengths:[],weaknesses:[],roleAssignments:[]};
  const teamAvg=(k:StatKey)=>members.reduce((a,m)=>a+m.stats[k],0)/members.length;

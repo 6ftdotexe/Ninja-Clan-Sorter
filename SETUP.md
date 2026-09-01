@@ -470,9 +470,9 @@ GET /api/version
 Expected release contract:
 
 ```text
-Application: 11.4.0
-Server:      11.4.0
-Frontend:    11.4.0
+Application: 11.5.5
+Server:      11.5.5
+Frontend:    11.5.5
 Schema:      11.4.0
 ```
 
@@ -496,3 +496,7 @@ Recommended rollout:
 3. Deploy the application with `npm start`.
 4. Verify `/api/health/ready` and `/api/version`.
 5. Confirm app/frontend/server/schema all report `11.4.0`.
+
+## V11.5.5 combat-expansion upgrade
+
+V11.5.5 is application-only and keeps the V11.4.0 database contract. Do not rerun the schema solely for this update if production already reports schema `11.4.0`. Deploy the application, run `npm run release:check`, and confirm `/api/version` reports application/frontend/server `11.5.5` with schema `11.4.0` and `schemaMatches: true`.

@@ -1,5 +1,5 @@
 import {requireSupabase,supabase,unwrapMaybe} from '../lib/supabase';
-import type {EquipmentCatalogItem,EquipmentInventoryItem,EquipmentSlot,StatKey,TrainingProfile} from '../types';
+import type {CombatStats,EquipmentCatalogItem,EquipmentInventoryItem,EquipmentSlot,StatKey,TrainingProfile} from '../types';
 
 export const EQUIPMENT_CATALOG:EquipmentCatalogItem[]=[
   {id:'chakra-blade',name:'Chakra Conductive Blade',slot:'weapon',price:350,description:'A balanced field blade designed to carry elemental chakra without overwhelming control.',bonuses:{ninjutsu:3,speed:2}},
@@ -62,6 +62,14 @@ export function equipmentBonuses(items:EquipmentInventoryItem[]){
   const total:Partial<Record<StatKey,number>>={};
   for(const entry of items.filter(item=>item.equipped))for(const [key,value] of Object.entries(entry.item.bonuses) as [StatKey,number][])total[key]=(total[key]||0)+value;
   return total;
+}
+
+
+export function effectiveCombatStats(base:CombatStats,training:TrainingProfile|null|undefined,items:EquipmentInventoryItem[],cap=120):CombatStats{
+  const gear=equipmentBonuses(items);
+  const merged={...base};
+  for(const key of validStats) merged[key]=Math.max(1,Math.min(cap,Number(base[key]||0)+Number(training?.bonuses[key]||0)+Number(gear[key]||0)));
+  return merged;
 }
 
 export function equipmentSlotLabel(slot:EquipmentSlot){return slot[0].toUpperCase()+slot.slice(1)}

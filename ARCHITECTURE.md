@@ -266,3 +266,10 @@ The exam UI uses `ExamAdventure` in `src/lib/minigames.tsx` as a client-side pla
 ## V11.5.4 Tactical Combat
 
 `src/lib/minigames.tsx` now includes a reusable tactical combat encounter used by Chūnin preliminary and final bouts. The client controls interactive HP/chakra combat and produces an execution score, while Supabase remains authoritative for official exam advancement and rewards. Effective combat stats combine identity-derived stats with current training and equipped-item bonuses loaded by `CompetitivePages.tsx`.
+
+
+## V11.5.5 Shared Combat Layer
+
+The tactical combat engine in `src/lib/minigames.tsx` is now reused across core gameplay rather than being isolated to Chūnin Exams. `MissionAdventure` turns its Objective stage into rank-scaled combat; `WorldEventsPage` uses boss encounters for rogue hunts, invasions, and summoning outbreaks; `RivalsPage` and `MatchupsPage` load the controlled shinobi's training, equipment, and jutsu before starting a battle; and `BingoBookPage` creates threat-scaled missing-nin encounters.
+
+`effectiveCombatStats()` in `src/features/training.ts` is the shared build-composition boundary for identity stats + permanent training + equipped-item bonuses. Interactive social battles reuse the existing `shinobi_matchups` table by converting the live combat result into a `MatchupAnalysis`, so V11.5.5 does not require a database migration. World-event rewards remain server-authoritative: the client must win the encounter gate before the existing event RPC can resolve the official participation record and rewards.

@@ -1,5 +1,20 @@
 # Changelog
 
+## V11.5.5 — Combat Expansion
+
+- Expanded tactical combat beyond Chūnin Exams.
+- Mission Objective stages now become full combat encounters with rank-scaled enemies.
+- Added build-aware mission combat using training, equipped gear, and saved jutsu.
+- Added live Rival battles and interactive Matchup Lab fights against public profiles.
+- Interactive matchup results are stored in the existing matchup history.
+- Added world-event boss battles for Rogue Hunts, Village Invasions, and Summoning Outbreaks.
+- Added direct Bingo Book hunt challenges against published missing-nin.
+- Added boss HP/chakra scaling and named enemy techniques.
+- Added Feint / Genjutsu combat action and build-derived player HP/chakra pools.
+- Added shared effective-combat-stat helper and regression tests for combat-result integration.
+- No Supabase schema change; expected schema remains V11.4.0.
+
+
 ## V11.5.4 — Tactical Combat Encounters
 
 - Added turn-based tactical battles with HP and chakra resources.

@@ -1,9 +1,9 @@
 # Shinobi Identity Archive — V11
 
 
-## V11.5.4 — Tactical Combat Gameplay
+## V11.5.5 — Combat Expansion
 
-V11.5.4 adds a turn-based tactical combat layer to Chūnin Exam battles. Combat now tracks health, chakra, jutsu costs, mastery, guard/counter decisions, chakra recovery, opponent styles, and build-derived damage while keeping official advancement server-authoritative.
+V11.5.5 turns tactical combat into a shared gameplay system instead of an exam-only mechanic. Mission objectives now include live encounters, rivalries and Matchup Lab can be fought directly, combat-heavy world events become boss battles, and public Bingo Book targets can be hunted interactively. Player builds still combine identity stats, training, equipment, and mastered jutsu.
 
 This is an application-only gameplay update. It runs against the existing V11.4.0 Supabase schema, so no schema migration is required when upgrading from V11.4.0.
 V11 is the current major release of the Shinobi Identity Archive. Phase 5 turns squads and villages into shared operational systems: teams can deploy into cooperative missions, village-aligned squads can contribute to a persistent village-war season, and career/training progression feeds directly into team performance.

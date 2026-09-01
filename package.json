@@ -1,7 +1,7 @@
 {
   "name": "shinobi-identity-archive-v11",
   "private": true,
-  "version": "11.5.4",
+  "version": "11.5.5",
   "type": "module",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:web\" \"npm:dev:server\"",
@@ -15,7 +15,7 @@
     "preflight": "tsx server/preflight.ts",
     "preflight:live": "tsx server/preflight.ts --live",
     "release:check": "npm run check && npm run preflight:artifact",
-    "test:unit": "vitest run src/engine/__tests__/quiz.test.ts server/__tests__/security.test.ts server/__tests__/payments-generation.test.ts server/__tests__/generation-failures.test.ts server/__tests__/release-schema.test.ts",
+    "test:unit": "vitest run src/engine/__tests__/quiz.test.ts src/engine/__tests__/combat.test.ts server/__tests__/security.test.ts server/__tests__/payments-generation.test.ts server/__tests__/generation-failures.test.ts server/__tests__/release-schema.test.ts",
     "test:smoke": "vitest run server/__tests__/api.smoke.test.ts",
     "test:regression": "npm run test:unit && npm run test:smoke",
     "preflight:artifact": "tsx server/preflight.ts --artifact"
