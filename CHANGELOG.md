@@ -1,5 +1,19 @@
 # Changelog
 
+## V11.0.0 — Phase 1: Living Villages + Career Records
+
+- Added persistent formal village membership for each owned shinobi across Konohagakure, Sunagakure, Kumogakure, Iwagakure, and Kirigakure.
+- Added a Living Villages directory with village level, membership, total reputation, mission contribution, and standing score.
+- Added dedicated public village pages with community summaries and ranked public rosters.
+- Added join, switch, and leave village flows protected by authenticated Supabase RPCs.
+- Added persistent Shinobi Career records that combine XP, field level, operational rank, mission outcomes, success rate, village reputation, titles, and next-promotion milestones.
+- Added public career summaries to published Shinobi profiles without exposing account-owner data.
+- Connected existing V10 mission/progression data directly into V11 village standings and career progression.
+- Added `/villages`, `/villages/:villageId`, and `/career` routes plus V11 navigation/branding.
+- Added `village_memberships` with RLS, indexes, safe public world RPCs, authenticated career RPCs, and V11 schema contracts.
+- Bumped application, frontend, server, and Supabase schema release to `11.0.0`.
+- V11.0.0 requires rerunning `supabase/schema.sql` before deployment.
+
 ## V10.5.1 — Build Compatibility Hotfix
 
 

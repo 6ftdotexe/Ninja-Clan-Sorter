@@ -44,6 +44,19 @@ npm run check
 
 ---
 
+
+## V11.0.0 schema upgrade
+
+V11 Phase 1 adds persistent village membership and career/world RPCs. Existing deployments upgrading from V10.5.x must re-run the current:
+
+```text
+supabase/schema.sql
+```
+
+Apply the schema **before** deploying the V11 application. Production startup expects schema version `11.0.0`. The schema is idempotent and preserves existing V10 character, mission, progression, payment, and community data.
+
+After deployment, verify `/api/version` reports application/frontend/server/schema version `11.0.0`.
+
 ## 3. Environment variables
 
 ### Browser-safe Supabase variables
@@ -393,28 +406,24 @@ Then verify in production:
 
 The current release intentionally keeps one evolving database file at `supabase/schema.sql`, one setup guide (`SETUP.md`), and one release history (`CHANGELOG.md`). New releases should update these files instead of adding phase-specific equivalents.
 
-## V10.5.0 consolidated stable update
+## Current production release — V11.0.0
 
-V10.5.0 is a single post-Phase-4 update that includes the codebase consolidation, reliability, recovery, security, performance, diagnostics, deployment hardening, and regression-testing work that was developed iteratively during stabilization. Treat it as one release rather than a sequence of separate production upgrades.
+V10.5.x remains the stable historical baseline. V11.0.0 is the current feature release and requires the V11 schema because Living Villages adds persistent membership plus village/career RPCs.
 
 ### Required upgrade order
 
-For any deployment coming from V10 Phase 4 / the earlier V10 codebase:
-
 1. Back up the current Supabase project/database.
-2. Run the current `supabase/schema.sql` once. This applies the full consolidated V10.5.0 schema, including release metadata, public-profile RPC boundaries, mission/progression protections, generation/payment integrity, account-recovery support, performance indexes/caches, and distributed rate limiting.
-3. Confirm `get_app_schema_version()` reports `10.5.0` through the server-side preflight path.
-4. Install dependencies and run `npm run release:check`.
-5. Deploy the V10.5.0 application/server.
+2. Run the current `supabase/schema.sql`.
+3. Confirm the live schema preflight reports `11.0.0`.
+4. Run `npm install` and `npm run release:check`.
+5. Deploy the V11.0.0 application/server.
 6. Point the platform health check at `/api/health/ready`.
-7. Verify `/api/version` reports application/server/frontend/schema version `10.5.0` with matching release status.
-8. Run one Stripe test-mode checkout, confirm the return lands on `/#/generator?purchase=success`, and verify credits appear.
-9. Run one test image generation and confirm generation history, credit deduction/refund behavior, and dossier save behavior.
-10. Run the Account self-check once after upgrade to reconcile any legacy account inconsistencies.
+7. Verify `/api/version` reports application/server/frontend/schema version `11.0.0`.
+8. Sign in, select a saved shinobi, join a village, and confirm `/career` reflects the membership.
+9. Complete a mission and confirm village reputation/mission totals update on the career and village pages.
+10. Publish a test shinobi and confirm its public profile shows the safe public career summary.
 
-### Production environment additions
-
-The consolidated update supports these optional deployment variables in addition to the existing Supabase, Stripe, OpenAI, and `APP_URL` values:
+### Production environment
 
 ```env
 TRUSTED_ORIGINS=
@@ -426,9 +435,9 @@ BUILD_TIMESTAMP=
 RELEASE_CHANNEL=production
 ```
 
-`RENDER_GIT_COMMIT` is detected automatically on Render when available. Keep `DIAGNOSTICS_TOKEN` unset unless the protected diagnostics endpoint is intentionally enabled.
+Render supplies `RENDER_GIT_COMMIT` automatically when available. Keep `DIAGNOSTICS_TOKEN` unset unless the protected diagnostics endpoint is intentionally enabled.
 
-### Release verification commands
+### Release verification
 
 ```bash
 npm install
@@ -436,16 +445,6 @@ npm run preflight
 npm run test:regression
 npm run release:check
 ```
-
-For a live environment/schema check:
-
-```bash
-npm run preflight:live
-```
-
-The release pipeline validates regression tests, TypeScript, the Vite production build, release metadata, and deployable build artifacts.
-
-### Runtime verification
 
 After deployment verify:
 
@@ -458,25 +457,12 @@ GET /api/version
 Expected release contract:
 
 ```text
-Application: 10.5.0
-Server:      10.5.0
-Frontend:    10.5.0
-Schema:      10.5.0
+Application: 11.0.0
+Server:      11.0.0
+Frontend:    11.0.0
+Schema:      11.0.0
 ```
-
-The server enters `starting`, `ready`, and `draining` lifecycle states. Production startup performs configuration/schema preflight before listening, and `SIGTERM`/`SIGINT` moves readiness to `503` while active requests drain.
 
 ### Diagnostics
 
-If `DIAGNOSTICS_TOKEN` is configured, the protected internal snapshot is available at:
-
-```text
-GET /api/internal/diagnostics
-X-Diagnostics-Token: <token>
-```
-
-Structured logs include request IDs, duration, route/operation names, slow-operation warnings, and categorized failures while intentionally excluding request bodies, authorization headers, prompt contents, photos, generated image data, emails, and user IDs.
-
-### V10 maintenance rule
-
-V10.5.0 is the stable V10 baseline. Future `10.5.x` releases should be limited to bug fixes, security fixes, deployment fixes, and regression corrections. New gameplay or product features should target V11.
+If `DIAGNOSTICS_TOKEN` is configured, the protected internal snapshot remains available at `GET /api/internal/diagnostics` with `X-Diagnostics-Token`. Structured logs continue to omit secrets, request bodies, prompt contents, images, emails, and user IDs.

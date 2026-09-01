@@ -3,7 +3,7 @@
 This document describes the current application only. Historical architecture changes belong in `CHANGELOG.md`; setup and deployment instructions belong in `SETUP.md`.
 
 
-## Consolidated V10.5.0 structure
+## V11.0.0 structure
 
 The runtime is intentionally organized around a small number of cohesive modules rather than one file per route or feature surface:
 
@@ -21,6 +21,7 @@ src/
     IdentityPages.tsx       # archive + quiz runner + results + dossier
     AccountPages.tsx        # home + auth + account management
     CommunityPages.tsx      # discover + public profiles
+    WorldPages.tsx          # village directory, village profile, career record
     SystemPages.tsx         # arsenal + missions + chronicle
     SocialPages.tsx         # teams + rivals + matchups
     GeneratorPage.tsx
@@ -31,6 +32,7 @@ src/
     missions.ts
     social.ts
     lore.ts
+    world.ts                # living villages + career records
   utils/
     character.ts            # normalized profile, combat stats, progression
   contexts/
@@ -72,6 +74,7 @@ Closely related logic and persistence are grouped into feature modules instead o
 - `src/features/missions.ts` — mission generation, mission resolution, and progression persistence.
 - `src/features/social.ts` — teams, rivals, matchup persistence, and tactical analysis.
 - `src/features/lore.ts` — chronicle generation, lore persistence, timeline operations, and profile customization.
+- `src/features/world.ts` — village directory/profile reads, formal membership, and Shinobi career records.
 
 Shared calculations that are reused across multiple features remain in `src/utils/`:
 
@@ -79,7 +82,7 @@ Shared calculations that are reused across multiple features remain in `src/util
 
 ## Accounts and database
 
-Supabase provides authentication, persistent characters, quiz results, generation wallets/history, public profiles, jutsu, missions/progression, teams/rivals/matchups, lore, and timelines.
+Supabase provides authentication, persistent characters, quiz results, generation wallets/history, public profiles, jutsu, missions/progression, teams/rivals/matchups, lore, timelines, village membership, village standings, and career records.
 
 The database definition is maintained as one evolving file:
 

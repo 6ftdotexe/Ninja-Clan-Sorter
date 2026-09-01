@@ -7,7 +7,7 @@ import { runPreflight } from '../preflight.js';
 describe('release contract', () => {
   it('keeps package.json aligned with the server release', async () => {
     await expect(verifyPackageVersion()).resolves.toBeUndefined();
-    expect(APP_VERSION).toBe('10.5.1');
+    expect(APP_VERSION).toBe('11.0.0');
   });
 
   it('ships the TypeScript runtime used by npm start as a production dependency', async () => {
@@ -17,7 +17,7 @@ describe('release contract', () => {
   });
 
   it('allows the application release to advance without requiring an unchanged schema migration', () => {
-    expect(EXPECTED_SCHEMA_VERSION).toBe('10.5.0');
+    expect(EXPECTED_SCHEMA_VERSION).toBe('11.0.0');
   });
 
   it('reports a matching frontend/server/schema release contract', async () => {
@@ -52,6 +52,11 @@ describe('Supabase security/schema contracts', () => {
       'create or replace function public.consume_api_rate_limit(',
       'create or replace function public.get_public_shinobi_profile_bundle(p_slug text)',
       'create or replace function public.complete_shinobi_mission_v10(',
+      'create table if not exists public.village_memberships',
+      'create or replace function public.join_village(',
+      'create or replace function public.list_village_directory()',
+      'create or replace function public.get_shinobi_career(',
+      'create or replace function public.get_public_shinobi_career(',
     ];
     for (const contract of required) expect(sql.toLowerCase()).toContain(contract.toLowerCase());
   });

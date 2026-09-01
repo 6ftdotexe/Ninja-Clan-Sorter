@@ -1,7 +1,7 @@
 {
-  "name": "shinobi-identity-archive-v10",
+  "name": "shinobi-identity-archive-v11",
   "private": true,
-  "version": "10.5.1",
+  "version": "11.0.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:web\" \"npm:dev:server\"",

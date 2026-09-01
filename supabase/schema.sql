@@ -1299,8 +1299,231 @@ $$;
 revoke all on function public.get_accessible_shinobi_by_ids(uuid[]) from public,anon;
 grant execute on function public.get_accessible_shinobi_by_ids(uuid[]) to authenticated;
 
+
 -- ============================================================================
--- Release metadata — V10.5.0+
+-- V11 Phase 1 — Living Villages + Shinobi Career
+-- ============================================================================
+create table if not exists public.village_memberships (
+  character_id uuid primary key references public.shinobi_characters(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  village_id text not null check (village_id in ('Konohagakure','Sunagakure','Kumogakure','Iwagakure','Kirigakure')),
+  joined_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.village_memberships enable row level security;
+create index if not exists village_memberships_village_idx on public.village_memberships(village_id,updated_at desc);
+create index if not exists village_memberships_user_idx on public.village_memberships(user_id,updated_at desc);
+
+drop policy if exists "village_memberships_select_own" on public.village_memberships;
+create policy "village_memberships_select_own" on public.village_memberships for select using (auth.uid()=user_id);
+drop policy if exists "village_memberships_insert_own" on public.village_memberships;
+create policy "village_memberships_insert_own" on public.village_memberships for insert with check (auth.uid()=user_id and exists(select 1 from public.shinobi_characters c where c.id=character_id and c.user_id=auth.uid()));
+drop policy if exists "village_memberships_update_own" on public.village_memberships;
+create policy "village_memberships_update_own" on public.village_memberships for update using (auth.uid()=user_id) with check (auth.uid()=user_id and exists(select 1 from public.shinobi_characters c where c.id=character_id and c.user_id=auth.uid()));
+drop policy if exists "village_memberships_delete_own" on public.village_memberships;
+create policy "village_memberships_delete_own" on public.village_memberships for delete using (auth.uid()=user_id);
+
+create or replace function public.join_village(p_character_id uuid,p_village_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare v_user uuid:=auth.uid(); v_row public.village_memberships;
+begin
+  if v_user is null then raise exception 'authentication required'; end if;
+  if p_village_id not in ('Konohagakure','Sunagakure','Kumogakure','Iwagakure','Kirigakure') then raise exception 'invalid village'; end if;
+  if not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=v_user) then raise exception 'character unavailable'; end if;
+  insert into public.village_memberships(character_id,user_id,village_id,joined_at,updated_at)
+  values(p_character_id,v_user,p_village_id,now(),now())
+  on conflict(character_id) do update set village_id=excluded.village_id,user_id=excluded.user_id,joined_at=case when public.village_memberships.village_id=excluded.village_id then public.village_memberships.joined_at else now() end,updated_at=now()
+  returning * into v_row;
+  return to_jsonb(v_row);
+end;
+$$;
+revoke all on function public.join_village(uuid,text) from public,anon;
+grant execute on function public.join_village(uuid,text) to authenticated;
+
+create or replace function public.leave_village(p_character_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare v_user uuid:=auth.uid(); v_count integer;
+begin
+  if v_user is null then raise exception 'authentication required'; end if;
+  delete from public.village_memberships where character_id=p_character_id and user_id=v_user;
+  get diagnostics v_count=row_count;
+  return v_count>0;
+end;
+$$;
+revoke all on function public.leave_village(uuid) from public,anon;
+grant execute on function public.leave_village(uuid) to authenticated;
+
+create or replace function public._village_summary(p_village_id text)
+returns jsonb
+language sql
+security definer
+set search_path=public
+stable
+as $$
+  with stats as (
+    select
+      count(*)::int member_count,
+      count(*) filter(where c.is_public=true)::int public_members,
+      coalesce(sum(p.village_reputation),0)::int total_reputation,
+      coalesce(round(avg(coalesce(p.level,1))),1)::numeric average_level,
+      coalesce(sum(p.completed_missions),0)::int completed_missions
+    from public.village_memberships vm
+    join public.shinobi_characters c on c.id=vm.character_id
+    left join public.shinobi_progression p on p.character_id=vm.character_id
+    where vm.village_id=p_village_id
+  )
+  select jsonb_build_object(
+    'village_id',p_village_id,
+    'member_count',member_count,
+    'public_members',public_members,
+    'total_reputation',total_reputation,
+    'average_level',average_level,
+    'completed_missions',completed_missions,
+    'village_level',greatest(1,floor(sqrt(greatest(0,total_reputation)::numeric/250))+1)::int,
+    'standing_score',(total_reputation + completed_missions*15 + public_members*10)::int
+  ) from stats;
+$$;
+revoke all on function public._village_summary(text) from public,anon,authenticated;
+
+create or replace function public.list_village_directory()
+returns jsonb
+language sql
+security definer
+set search_path=public
+stable
+as $$
+  select jsonb_agg(public._village_summary(village_id) order by ((public._village_summary(village_id)->>'standing_score')::int) desc)
+  from (values ('Konohagakure'),('Sunagakure'),('Kumogakure'),('Iwagakure'),('Kirigakure')) v(village_id);
+$$;
+revoke all on function public.list_village_directory() from public;
+grant execute on function public.list_village_directory() to anon,authenticated;
+
+create or replace function public.get_village_profile(p_village_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+stable
+as $$
+declare v_members jsonb;
+begin
+  if p_village_id not in ('Konohagakure','Sunagakure','Kumogakure','Iwagakure','Kirigakure') then return null; end if;
+  select coalesce(jsonb_agg(member_payload order by reputation desc,updated_at desc),'[]'::jsonb)
+  into v_members
+  from (
+    select jsonb_build_object(
+      'character',public._public_shinobi_json(c),
+      'level',coalesce(p.level,1),
+      'reputation',coalesce(p.village_reputation,0),
+      'completed_missions',coalesce(p.completed_missions,0),
+      'title',coalesce(p.current_title,'New Operative')
+    ) member_payload,
+    coalesce(p.village_reputation,0) reputation,
+    c.updated_at
+    from public.village_memberships vm
+    join public.shinobi_characters c on c.id=vm.character_id and c.is_public=true
+    left join public.shinobi_progression p on p.character_id=vm.character_id
+    where vm.village_id=p_village_id
+    order by coalesce(p.village_reputation,0) desc,c.updated_at desc
+    limit 60
+  ) roster;
+  return jsonb_build_object('summary',public._village_summary(p_village_id),'members',v_members);
+end;
+$$;
+revoke all on function public.get_village_profile(text) from public;
+grant execute on function public.get_village_profile(text) to anon,authenticated;
+
+create or replace function public._career_json(p_character_id uuid)
+returns jsonb
+language sql
+security definer
+set search_path=public
+stable
+as $$
+  with base as (
+    select c.id,c.rank,
+      vm.village_id,vm.joined_at,
+      coalesce(p.xp,0)::int xp,coalesce(p.level,1)::int level,coalesce(p.village_reputation,0)::int village_reputation,
+      coalesce(p.completed_missions,0)::int completed_missions,coalesce(p.d_missions,0)::int d_missions,coalesce(p.c_missions,0)::int c_missions,
+      coalesce(p.b_missions,0)::int b_missions,coalesce(p.a_missions,0)::int a_missions,coalesce(p.s_missions,0)::int s_missions,
+      coalesce(p.current_title,'New Operative') current_title,
+      count(m.id) filter(where m.status='completed')::int mission_successes,
+      count(m.id) filter(where m.status='failed')::int mission_failures,
+      count(m.id) filter(where m.status='abandoned')::int mission_abandoned
+    from public.shinobi_characters c
+    left join public.village_memberships vm on vm.character_id=c.id
+    left join public.shinobi_progression p on p.character_id=c.id
+    left join public.shinobi_missions m on m.character_id=c.id
+    where c.id=p_character_id
+    group by c.id,c.rank,vm.village_id,vm.joined_at,p.xp,p.level,p.village_reputation,p.completed_missions,p.d_missions,p.c_missions,p.b_missions,p.a_missions,p.s_missions,p.current_title
+  ), ranked as (
+    select *,case
+      when level>=40 and completed_missions>=60 and s_missions>=3 and lower(coalesce(rank,'')) ~ '(kagepotential|kage potential|legendary)' then 'Kage'
+      when level>=30 and completed_missions>=40 and a_missions>=6 then 'Kage Candidate'
+      when level>=22 and completed_missions>=25 and a_missions>=2 then 'Elite Jōnin'
+      when level>=15 and completed_missions>=15 and b_missions>=3 then 'Jōnin'
+      when level>=10 and completed_missions>=8 and b_missions>=1 then 'Special Jōnin'
+      when level>=5 and completed_missions>=3 then 'Chūnin'
+      else 'Genin' end operational_rank
+    from base
+  )
+  select jsonb_build_object(
+    'character_id',id,'village_id',village_id,'joined_at',joined_at,'xp',xp,'level',level,'village_reputation',village_reputation,
+    'completed_missions',completed_missions,'d_missions',d_missions,'c_missions',c_missions,'b_missions',b_missions,'a_missions',a_missions,'s_missions',s_missions,
+    'current_title',current_title,'mission_successes',mission_successes,'mission_failures',mission_failures,'mission_abandoned',mission_abandoned,
+    'success_rate',case when mission_successes+mission_failures=0 then 0 else round(mission_successes::numeric/(mission_successes+mission_failures)*100)::int end,
+    'operational_rank',operational_rank,
+    'next_milestone',case operational_rank
+      when 'Genin' then 'Reach level 5 and complete 3 missions to qualify for Chūnin.'
+      when 'Chūnin' then 'Reach level 10, complete 8 missions, and finish a B-rank mission.'
+      when 'Special Jōnin' then 'Reach level 15, complete 15 missions, and finish 3 B-rank missions.'
+      when 'Jōnin' then 'Reach level 22, complete 25 missions, and finish 2 A-rank missions.'
+      when 'Elite Jōnin' then 'Reach level 30, complete 40 missions, and finish 6 A-rank missions.'
+      when 'Kage Candidate' then 'Reach level 40, 60 missions, 3 S-rank missions, and Kage/Legendary potential.'
+      else 'You have reached the highest current field rank.' end
+  ) from ranked;
+$$;
+revoke all on function public._career_json(uuid) from public,anon,authenticated;
+
+create or replace function public.get_shinobi_career(p_character_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+stable
+as $$
+begin
+  if auth.uid() is null or not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=auth.uid()) then return null; end if;
+  return public._career_json(p_character_id);
+end;
+$$;
+revoke all on function public.get_shinobi_career(uuid) from public,anon;
+grant execute on function public.get_shinobi_career(uuid) to authenticated;
+
+create or replace function public.get_public_shinobi_career(p_slug text)
+returns jsonb
+language sql
+security definer
+set search_path=public
+stable
+as $$
+  select public._career_json(c.id) from public.shinobi_characters c
+  where c.is_public=true and c.public_slug=p_slug and char_length(coalesce(p_slug,'')) between 1 and 80
+  limit 1;
+$$;
+revoke all on function public.get_public_shinobi_career(text) from public;
+grant execute on function public.get_public_shinobi_career(text) to anon,authenticated;
+
+-- ============================================================================
+-- Release metadata — V11.0.0+
 -- The application uses this to verify that the deployed server and database
 -- schema were rolled out together before reporting readiness.
 -- ============================================================================
@@ -1313,7 +1536,7 @@ alter table public.app_release_metadata enable row level security;
 revoke all on public.app_release_metadata from public,anon,authenticated;
 
 insert into public.app_release_metadata(key,value,updated_at)
-values('schema_version','10.5.0',now())
+values('schema_version','11.0.0',now())
 on conflict(key) do update set value=excluded.value,updated_at=excluded.updated_at;
 
 create or replace function public.get_app_schema_version()

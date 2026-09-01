@@ -34,7 +34,7 @@ export const CREDIT_PACKS = {
 export type CreditPackId = keyof typeof CREDIT_PACKS;
 
 export const serverStatus = {
-  service: 'shinobi-v10',
+  service: 'shinobi-v11',
   imageProvider: 'openai',
   imageModel: OPENAI_IMAGE_MODEL,
   paymentsConfigured: Boolean(stripe && stripeWebhookSecret),

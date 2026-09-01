@@ -85,7 +85,7 @@ export function xpForLevel(level:number){return Math.max(0,Math.round((level-1)*
 export function xpForNextLevel(level:number){return xpForLevel(level+1)}
 export function operationalRank(progression:ShinobiProgression,profile:NormalizedShinobiProfile){
   const potential=profile.rankPotential.toLowerCase();
-  const kageEligible=progression.level>=40&&progression.completed_missions>=60&&progression.s_missions>=3&&/(kage potential|legendary)/.test(potential);
+  const kageEligible=progression.level>=40&&progression.completed_missions>=60&&progression.s_missions>=3&&/(kagepotential|kage potential|legendary)/.test(potential);
   if(kageEligible)return 'Kage';
   return FIELD_RANKS.find(rule=>rule.eligible(progression))?.label||'Genin';
 }

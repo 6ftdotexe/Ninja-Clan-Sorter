@@ -51,3 +51,10 @@ export interface ShinobiTeamMember { id:string; team_id:string; character_id:str
 export interface ShinobiRival { id:string; user_id:string; character_id:string; rival_character_id:string; note:string|null; created_at:string; rival?:ShinobiCharacter; character?:ShinobiCharacter }
 export interface MatchupRecord { id:string; user_id:string; left_character_id:string; right_character_id:string; winner_character_id:string|null; analysis:MatchupAnalysis; created_at:string }
 export interface TeamAnalysis { rating:number; cohesion:number; coverage:number; leadership:number; strengths:string[]; weaknesses:string[]; roleAssignments:{characterId:string;name:string;role:string}[] }
+
+export type VillageId='Konohagakure'|'Sunagakure'|'Kumogakure'|'Iwagakure'|'Kirigakure';
+export interface VillageMembership{character_id:string;user_id:string;village_id:VillageId;joined_at:string;updated_at:string}
+export interface VillageDirectoryEntry{village_id:VillageId;member_count:number;public_members:number;total_reputation:number;average_level:number;completed_missions:number;village_level:number;standing_score:number}
+export interface VillagePublicMember{character:ShinobiCharacter;level:number;reputation:number;completed_missions:number;title:string}
+export interface VillageProfile{summary:VillageDirectoryEntry;members:VillagePublicMember[]}
+export interface CareerRecord{character_id:string;village_id:VillageId|null;joined_at:string|null;xp:number;level:number;village_reputation:number;completed_missions:number;d_missions:number;c_missions:number;b_missions:number;a_missions:number;s_missions:number;current_title:string;mission_successes:number;mission_failures:number;mission_abandoned:number;success_rate:number;operational_rank:string;next_milestone:string}

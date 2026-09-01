@@ -201,7 +201,7 @@ function ResultPanel({ c }: { c: Controller }) {
 export function GeneratorPage() {
   const c = useGeneratorController();
   return <div className="screen generator-page">
-    <PageHeader eyebrow="V10 · OPENAI VISUAL LAB" title="Generate My Shinobi" description="Your actual reference photo + full identity profile are sent to OpenAI for a higher-fidelity transformation." action={<button className="btn ghost" onClick={() => c.nav('/archive')}>Back to archive</button>} />
+    <PageHeader eyebrow="V11 · OPENAI VISUAL LAB" title="Generate My Shinobi" description="Your actual reference photo + full identity profile are sent to OpenAI for a higher-fidelity transformation." action={<button className="btn ghost" onClick={() => c.nav('/archive')}>Back to archive</button>} />
     <Feedback notice={c.notice} />
     {!c.complete && <div className="generator-warning">Complete at least Clan, Village and Chakra trials for a meaningful generation.</div>}
     <CreditPanel c={c} />

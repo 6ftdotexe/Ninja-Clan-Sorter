@@ -1,10 +1,12 @@
-# Shinobi Identity Archive V10
+# Shinobi Identity Archive V11
 
-V10 is the current complete release of the Shinobi Identity Archive: a React + TypeScript shinobi identity platform with cloud accounts, multiple saved characters, advanced identity trials, paid AI character generation, public profiles, combat stats, jutsu, missions, progression, teams, rivalries, matchups, lore, timelines, and profile customization.
+V11 is the current major release of the Shinobi Identity Archive. Phase 1 begins the Living Shinobi World by adding persistent village membership and career records to the existing identity platform: a React + TypeScript shinobi identity platform with cloud accounts, multiple saved characters, advanced identity trials, paid AI character generation, public profiles, combat stats, jutsu, missions, progression, teams, rivalries, matchups, lore, timelines, and profile customization.
 
-## Production Readiness
+## V11 Phase 1 — Living Villages + Career Records
 
-V10.5.1 is the current V10 maintenance release, applying a TypeScript build-compatibility hotfix on top of the consolidated V10.5.0 stable baseline. Run `npm run release:check` before deployment, keep the deployed Supabase schema at V10.5.0, and verify `/api/health/ready` plus `/api/version` after rollout.
+V11.0.0 adds five persistent village communities, village standings/rosters, formal per-character membership, and a career record that combines field rank, XP, mission outcomes, and village reputation. Existing V10 systems remain intact and now feed the new world layer.
+
+This release requires the V11.0.0 Supabase schema before deployment. Run `npm run release:check`, deploy schema-first, then verify `/api/health/ready` and `/api/version`.
 
 ## Documentation
 
@@ -56,9 +58,9 @@ See `SETUP.md` for the complete current configuration.
 
 ## Codebase consolidation
 
-The maintained frontend is now 25 source files, with related route surfaces grouped by domain rather than split into one-file-per-screen modules.
+The maintained frontend remains intentionally compact, with related route surfaces grouped by domain rather than split into one-file-per-screen modules.
 
-V10.5.0 keeps related routes and UI surfaces together to reduce file count without collapsing independent domain services into oversized modules. See `ARCHITECTURE.md` for the current structure.
+V11 keeps related routes and UI surfaces together to reduce file count without collapsing independent domain services into oversized modules. See `ARCHITECTURE.md` for the current structure.
 
 
 ### Server modules
