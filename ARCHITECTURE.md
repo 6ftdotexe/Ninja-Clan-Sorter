@@ -261,3 +261,8 @@ The Phase 5 routes are `/operations` and `/wars`; both reuse the existing consol
 
 ## V11.5.3 Chūnin Exam Event
 The exam UI uses `ExamAdventure` in `src/lib/minigames.tsx` as a client-side playable gate for the existing server-authoritative Chūnin Exam RPC. Tactical, survival, preliminary, and finals stages each use distinct interaction patterns while Supabase remains the source of truth for official scores, qualification, season points, and progression rewards. No schema change is required beyond the V11.4.0 database.
+
+
+## V11.5.4 Tactical Combat
+
+`src/lib/minigames.tsx` now includes a reusable tactical combat encounter used by Chūnin preliminary and final bouts. The client controls interactive HP/chakra combat and produces an execution score, while Supabase remains authoritative for official exam advancement and rewards. Effective combat stats combine identity-derived stats with current training and equipped-item bonuses loaded by `CompetitivePages.tsx`.

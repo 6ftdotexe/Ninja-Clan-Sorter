@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useState} from 'react';
+import type {CombatStats,JutsuTechnique} from '../types';
 
 export type ActivityKind='mission'|'training'|'exam'|'world'|'team'|'war'|'mastery';
 export type ActivityResult={score:number;passed:boolean;rounds:number[]};
@@ -190,7 +191,45 @@ export function MissionAdventure({title,difficulty=55,objective,location,onCompl
 
 
 export type ExamAdventureResult={score:number;passed:boolean;segments:string[];segmentScores:number[]};
-type ExamAdventureProps={stage:'tactical'|'survival'|'preliminaries'|'finals';title:string;difficulty?:number;onComplete:(result:ExamAdventureResult)=>void|Promise<void>;onCancel:()=>void};
+type ExamAdventureProps={stage:'tactical'|'survival'|'preliminaries'|'finals';title:string;difficulty?:number;combatStats?:CombatStats;jutsu?:JutsuTechnique[];onComplete:(result:ExamAdventureResult)=>void|Promise<void>;onCancel:()=>void};
+
+type CombatOpponent={name:string;style:string;detail:string;power:number;affinity:'pressure'|'control'|'adaptive'};
+type CombatResult={score:number;won:boolean;rounds:number;hp:number;chakra:number};
+const JUTSU_COST:Record<string,number>={Low:14,Moderate:22,High:32,Extreme:44};
+const RANK_POWER:Record<string,number>={D:8,C:12,B:18,A:25,S:34};
+function stat(stats:CombatStats|undefined,key:keyof CombatStats,fallback=55){return stats?Number(stats[key]||fallback):fallback}
+function combatJutsu(jutsu:JutsuTechnique[]|undefined){return (jutsu||[]).filter(x=>x.slot||x.masteryLevel>1).sort((a,b)=>b.masteryLevel-a.masteryLevel).slice(0,4)}
+
+export function CombatEncounter({title,opponent,stats,jutsu,difficulty=70,onComplete,onCancel}:{title:string;opponent:CombatOpponent;stats?:CombatStats;jutsu?:JutsuTechnique[];difficulty?:number;onComplete:(result:CombatResult)=>void|Promise<void>;onCancel:()=>void}){
+  const techniques=useMemo(()=>combatJutsu(jutsu),[jutsu]);
+  const [hp,setHp]=useState(100);const [enemyHp,setEnemyHp]=useState(100);const [chakra,setChakra]=useState(100);const [enemyChakra,setEnemyChakra]=useState(100);
+  const [round,setRound]=useState(1);const [log,setLog]=useState<string[]>([`${opponent.name} enters the arena.`]);const [finished,setFinished]=useState(false);const [busy,setBusy]=useState(false);
+  const playerPower=(stat(stats,'taijutsu')+stat(stats,'ninjutsu')+stat(stats,'speed')+stat(stats,'chakraControl'))/4;
+  const enemyPower=clamp(opponent.power+difficulty*.18,48,94);
+  const append=(line:string)=>setLog(v=>[line,...v].slice(0,8));
+  const resolveEnemy=(guarding:boolean,currentHp:number,currentEnemyHp:number)=>{
+    if(currentEnemyHp<=0){setFinished(true);setBusy(false);return;}
+    const roll=Math.random();let damage=0;let text='';let nextEnemyChakra=enemyChakra;
+    const usesJutsu=(opponent.affinity==='control'&&enemyChakra>=22&&roll>.3)||(opponent.affinity==='adaptive'&&enemyChakra>=22&&roll>.52);
+    if(usesJutsu){damage=Math.round(10+enemyPower*.16+Math.random()*7);nextEnemyChakra=Math.max(0,enemyChakra-22);text=`${opponent.name} releases a chakra technique for ${damage} damage.`;}
+    else if(roll<.16){nextEnemyChakra=Math.min(100,enemyChakra+18);text=`${opponent.name} creates distance and recovers chakra.`;}
+    else{damage=Math.round(8+enemyPower*.13+Math.random()*6);text=`${opponent.name} attacks for ${damage} damage.`;}
+    let nextEnemyHp=currentEnemyHp;
+    if(guarding&&damage){const reduction=clamp(34+(stat(stats,'adaptability')-50)*.35,28,58);damage=Math.round(damage*(1-reduction/100));text+=` Guard reduces it to ${damage}.`;const counterChance=clamp((stat(stats,'speed')+stat(stats,'adaptability')-100)/180,.08,.42);if(Math.random()<counterChance){const counter=Math.round(5+stat(stats,'taijutsu')*.08);nextEnemyHp=Math.max(0,nextEnemyHp-counter);text+=` Counter lands for ${counter}.`;}}
+    const nextHp=Math.max(0,currentHp-damage);setHp(nextHp);setEnemyHp(nextEnemyHp);setEnemyChakra(nextEnemyChakra);setRound(v=>v+1);append(text);setBusy(false);
+    if(nextHp<=0||nextEnemyHp<=0)setFinished(true);
+  };
+  const act=(type:'strike'|'guard'|'focus'|'jutsu',technique?:JutsuTechnique)=>{
+    if(busy||finished||hp<=0||enemyHp<=0)return;setBusy(true);let damage=0;let nextChakra=chakra;let guarding=false;let text='';
+    if(type==='strike'){damage=Math.round(7+(stat(stats,'taijutsu')+stat(stats,'strength'))*.07+Math.random()*7);nextChakra=Math.min(100,chakra+6);text=`You land a close-range strike for ${damage}.`;}
+    if(type==='guard'){guarding=true;nextChakra=Math.min(100,chakra+10);text='You settle into a guarded counter stance.';}
+    if(type==='focus'){const gain=Math.round(18+stat(stats,'chakraControl')*.08);nextChakra=Math.min(100,chakra+gain);text=`You mold chakra and recover ${gain}.`;}
+    if(type==='jutsu'&&technique){const cost=JUTSU_COST[technique.chakraCost]||22;if(chakra<cost){append(`Not enough chakra for ${technique.name}.`);setBusy(false);return;}nextChakra=Math.max(0,chakra-cost);const mastery=1+(technique.masteryLevel-1)*.1;damage=Math.round((RANK_POWER[technique.rank]||16)+(stat(stats,'ninjutsu')+stat(stats,'chakraControl'))*.09*mastery+Math.random()*8);if(technique.role.toLowerCase().includes('control'))damage+=3;text=`${technique.name} hits for ${damage}.`;}
+    const nextEnemy=Math.max(0,enemyHp-damage);setEnemyHp(nextEnemy);setChakra(nextChakra);append(text);if(nextEnemy<=0){setFinished(true);setBusy(false);return;}window.setTimeout(()=>resolveEnemy(guarding,hp,nextEnemy),220);
+  };
+  const won=enemyHp<=0&&hp>0;const score=clamp(Math.round((won?55:20)+hp*.25+chakra*.08-Math.max(0,round-8)*2+(playerPower-enemyPower)*.35));
+  return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel combat-encounter"><div className="activity-head"><div><span className="eyebrow">TACTICAL COMBAT</span><h3>{title}</h3><p>{opponent.name} · {opponent.style} — {opponent.detail}</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="combat-hud"><div><span>YOU · HP {hp}</span><div className="combat-bar hp"><i style={{width:`${hp}%`}}/></div><span>CHAKRA {chakra}</span><div className="combat-bar chakra"><i style={{width:`${chakra}%`}}/></div></div><b>ROUND {round}</b><div><span>{opponent.name} · HP {enemyHp}</span><div className="combat-bar enemy"><i style={{width:`${enemyHp}%`}}/></div><span>CHAKRA {enemyChakra}</span><div className="combat-bar chakra"><i style={{width:`${enemyChakra}%`}}/></div></div></div>{!finished?<><div className="combat-actions"><button disabled={busy} onClick={()=>act('strike')}><strong>Strike</strong><small>Reliable · +6 chakra</small></button><button disabled={busy} onClick={()=>act('guard')}><strong>Guard / Counter</strong><small>Reduce damage · counter chance</small></button><button disabled={busy} onClick={()=>act('focus')}><strong>Focus Chakra</strong><small>Recover chakra · vulnerable</small></button></div><div className="combat-jutsu"><span className="eyebrow">JUTSU</span>{techniques.length?<div>{techniques.map(t=>{const cost=JUTSU_COST[t.chakraCost]||22;return <button key={t.id} disabled={busy||chakra<cost} onClick={()=>act('jutsu',t)}><strong>{t.name}</strong><span>{t.rank}-Rank · Mastery Lv {t.masteryLevel}</span><small>{cost} chakra · {t.role}</small></button>})}</div>:<p className="muted">No mastered/loadout jutsu available. Win through fundamentals or develop your Arsenal first.</p>}</div></>:<div className={`activity-result ${won?'passed':'failed'}`}><span className="eyebrow">BATTLE RESULT</span><strong>{score}</strong><h3>{won?'Victory':'Defeat'}</h3><p className="muted">{hp} HP · {chakra} chakra · {round} rounds</p><button className="btn primary" onClick={()=>void onComplete({score,won,rounds:round,hp,chakra})}>{won?'Advance':'Record Defeat'}</button></div>}<div className="combat-log">{log.map((line,index)=><p key={`${line}-${index}`}>{line}</p>)}</div></div></div>;
+}
 
 const WRITTEN_QUESTIONS=[
   {q:'Your squad is ordered to recover intelligence, but an ally is injured before extraction. What best demonstrates Chūnin judgment?',choices:['Abandon the objective immediately','Protect the ally while preserving the intelligence and adapting extraction','Pursue the enemy alone','Wait for another squad to decide'],best:1},
@@ -205,58 +244,23 @@ const FOREST_CHOICES=[
   {name:'Scroll Encounter',prompt:'You locate the required scroll, but another team is approaching.',choices:[['Secure the scroll, create distance, and avoid unnecessary battle',100],['Set an ambush while keeping an escape route',78],['Stand in the open and wait',35]] as [string,number][]},
 ];
 const OPPONENTS=[
-  {name:'Ren Kurogane',style:'Pressure Fighter',detail:'Fast close-range pressure with strong counters.',kind:'training' as ActivityKind,mod:4},
-  {name:'Mika Shiosai',style:'Control Specialist',detail:'Patient spacing, traps, and chakra control.',kind:'mastery' as ActivityKind,mod:7},
-  {name:'Daichi Arashi',style:'Adaptive Tactician',detail:'Reads habits and changes tempo between exchanges.',kind:'exam' as ActivityKind,mod:10},
+  {name:'Ren Kurogane',style:'Pressure Fighter',detail:'Fast close-range pressure with strong counters.',kind:'training' as ActivityKind,mod:4,power:62,affinity:'pressure' as const},
+  {name:'Mika Shiosai',style:'Control Specialist',detail:'Patient spacing, traps, and chakra control.',kind:'mastery' as ActivityKind,mod:7,power:68,affinity:'control' as const},
+  {name:'Daichi Arashi',style:'Adaptive Tactician',detail:'Reads habits and changes tempo between exchanges.',kind:'exam' as ActivityKind,mod:10,power:74,affinity:'adaptive' as const},
 ];
 
-export function ExamAdventure({stage,title,difficulty=60,onComplete,onCancel}:ExamAdventureProps){
-  const [phase,setPhase]=useState(0);
-  const [scores,setScores]=useState<number[]>([]);
-  const [segments,setSegments]=useState<string[]>([]);
-  const [challenge,setChallenge]=useState<{kind:ActivityKind;label:string;difficulty:number}|null>(null);
-  const [finished,setFinished]=useState(false);
-  const passMark=threshold(difficulty);
-  const finalScore=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;
+export function ExamAdventure({stage,title,difficulty=60,combatStats,jutsu,onComplete,onCancel}:ExamAdventureProps){
+  const [phase,setPhase]=useState(0);const [scores,setScores]=useState<number[]>([]);const [segments,setSegments]=useState<string[]>([]);const [challenge,setChallenge]=useState<{kind:ActivityKind;label:string;difficulty:number}|null>(null);const [combat,setCombat]=useState<{label:string;opponent:(typeof OPPONENTS)[number];difficulty:number}|null>(null);const [finished,setFinished]=useState(false);
+  const passMark=threshold(difficulty);const finalScore=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;
   const finish=(nextScores:number[],nextSegments:string[])=>{setScores(nextScores);setSegments(nextSegments);setFinished(true)};
   const add=(label:string,value:number)=>{const ns=[...scores,Math.round(clamp(value))];const nl=[...segments,label];setScores(ns);setSegments(nl);return [ns,nl] as const};
-
-  if(challenge){
-    return <ActivityChallenge kind={challenge.kind} title={`${title} · ${challenge.label}`} difficulty={challenge.difficulty} focus="Your execution determines whether you control this exam encounter." onCancel={()=>setChallenge(null)} onComplete={(result)=>{
-      const [ns,nl]=add(challenge.label,result.score);setChallenge(null);
-      if(stage==='survival'){finish(ns,nl);return;}
-      if(stage==='preliminaries'){if(scores.length===0)return;finish(ns,nl);return;}
-      if(stage==='finals'){if(phase===0){setPhase(1);return;}finish(ns,nl);return;}
-    }}/>;
-  }
-
-  if(finished){
-    const passed=finalScore>=passMark;
-    return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">CHŪNIN EXAM EVENT</span><h3>{title}</h3><p>Stage debrief</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className={`activity-result ${passed?'passed':'failed'}`}><strong>{finalScore}</strong><h3>{passed?'Stage Cleared':'Stage Failed'}</h3><p className="muted">Interactive target: {Math.round(passMark)}. The official server evaluation will still combine this stage clear with your shinobi career and build.</p><div className="activity-rounds">{segments.map((label,index)=><span key={`${label}-${index}`}>{label}: {scores[index]??0}</span>)}</div><button className="btn primary" onClick={()=>void onComplete({score:finalScore,passed,segments,segmentScores:scores})}>{passed?'Submit Stage for Official Evaluation':'Record Failed Attempt'}</button></div></div></div>;
-  }
-
-  if(stage==='tactical'){
-    const q=WRITTEN_QUESTIONS[phase%WRITTEN_QUESTIONS.length];
-    const answer=(index:number)=>{const value=index===q.best?100:index===((q.best+1)%q.choices.length)?60:25;const [ns,nl]=add(`Question ${phase+1}`,value);if(phase>=2)finish(ns,nl);else setPhase(v=>v+1)};
-    return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">WRITTEN EXAM · QUESTION {phase+1}/3</span><h3>{title}</h3><p>Judgment matters more than speed.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-event-progress"><i style={{width:`${phase/3*100}%`}}/></div><div className="activity-stage"><h4>{q.q}</h4><div className="tactic-options">{q.choices.map((choice,index)=><button className="btn secondary" key={choice} onClick={()=>answer(index)}>{choice}</button>)}</div></div></div></div>;
-  }
-
-  if(stage==='survival'){
-    if(phase<FOREST_CHOICES.length){const part=FOREST_CHOICES[phase];const choose=(label:string,value:number)=>{add(part.name,value);if(phase>=FOREST_CHOICES.length-1){setPhase(v=>v+1);setChallenge({kind:'mission',label:'Forest Extraction',difficulty:clamp(difficulty+8,30,95)});}else setPhase(v=>v+1)};return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">SURVIVAL EXERCISE · {phase+1}/4</span><h3>Forest of Trial</h3><p>Your earlier decisions carry into the extraction run.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-forest-card"><span>{part.name.toUpperCase()}</span><h4>{part.prompt}</h4><div className="mission-route-grid">{part.choices.map(([label,value])=><button key={label} onClick={()=>choose(label,value)}><strong>{label}</strong><small>{value>=90?'Disciplined':value>=60?'Risky':'Reckless'} approach</small></button>)}</div></div></div></div>}
-  }
-
-  if(stage==='preliminaries'){
-    const opponent=OPPONENTS[phase===0?0:1];
-    if(phase===0&&scores.length===0){return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">PRELIMINARY BATTLE</span><h3>Select Your Opponent</h3><p>Different fighting styles produce different execution pressure.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-opponents">{OPPONENTS.map((op,index)=><button key={op.name} onClick={()=>{setSegments([]);setScores([]);setPhase(index+10);setChallenge({kind:op.kind,label:`Bout vs ${op.name}`,difficulty:clamp(difficulty+op.mod,35,96)})}}><strong>{op.name}</strong><span>{op.style}</span><small>{op.detail}</small></button>)}</div></div></div>}
-    if(phase>=10&&scores.length===1){return <div className="activity-overlay"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">PRELIMINARY BATTLE</span><h3>Final Exchange</h3><p>Your opponent adjusts after the opening exchange.</p></div></div><div className="exam-fight-card"><strong>Score after opening: {scores[0]}</strong><p>Choose how to close the match.</p><div className="tactic-options"><button className="btn secondary" onClick={()=>setChallenge({kind:'training',label:'Counterattack Exchange',difficulty:clamp(difficulty+8,35,96)})}>Counterattack</button><button className="btn secondary" onClick={()=>setChallenge({kind:'mastery',label:'Technique Finish',difficulty:clamp(difficulty+10,35,96)})}>Technique Finish</button></div></div></div></div>}
-  }
-
-  if(stage==='finals'){
-    const bout=phase===0?'Semifinal':'Championship Final';
-    const opponent=phase===0?OPPONENTS[1]:OPPONENTS[2];
-    return <div className="activity-overlay"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">FINAL TOURNAMENT</span><h3>{bout}</h3><p>Win both bracket bouts to post a championship-level execution score.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-bracket"><div className={phase===0?'active':'done'}><span>SEMIFINAL</span><strong>{scores[0]!==undefined?`Cleared · ${scores[0]}`:opponent.name}</strong></div><div className={phase===1?'active':''}><span>FINAL</span><strong>{phase===1?OPPONENTS[2].name:'Locked'}</strong></div></div><div className="exam-fight-card"><strong>{opponent.name} · {opponent.style}</strong><p>{opponent.detail}</p><button className="btn primary" onClick={()=>setChallenge({kind:phase===0?'team':'war',label:bout,difficulty:clamp(difficulty+(phase===0?5:12),40,98)})}>Enter {bout}</button></div></div></div>;
-  }
-
+  if(combat)return <CombatEncounter title={`${title} · ${combat.label}`} opponent={combat.opponent} stats={combatStats} jutsu={jutsu} difficulty={combat.difficulty} onCancel={()=>setCombat(null)} onComplete={(result)=>{const [ns,nl]=add(combat.label,result.score);setCombat(null);if(stage==='preliminaries'){finish(ns,nl);return;}if(stage==='finals'){if(phase===0&&result.won){setPhase(1);return;}finish(ns,nl);}}}/>;
+  if(challenge)return <ActivityChallenge kind={challenge.kind} title={`${title} · ${challenge.label}`} difficulty={challenge.difficulty} focus="Your execution determines whether you control this exam encounter." onCancel={()=>setChallenge(null)} onComplete={(result)=>{const [ns,nl]=add(challenge.label,result.score);setChallenge(null);if(stage==='survival')finish(ns,nl)}}/>;
+  if(finished){const passed=finalScore>=passMark;return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">CHŪNIN EXAM EVENT</span><h3>{title}</h3><p>Stage debrief</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className={`activity-result ${passed?'passed':'failed'}`}><strong>{finalScore}</strong><h3>{passed?'Stage Cleared':'Stage Failed'}</h3><p className="muted">Interactive target: {Math.round(passMark)}. The official server evaluation still controls advancement, qualification, and rewards.</p><div className="activity-rounds">{segments.map((label,index)=><span key={`${label}-${index}`}>{label}: {scores[index]??0}</span>)}</div><button className="btn primary" onClick={()=>void onComplete({score:finalScore,passed,segments,segmentScores:scores})}>{passed?'Submit Stage for Official Evaluation':'Record Failed Attempt'}</button></div></div></div>}
+  if(stage==='tactical'){const q=WRITTEN_QUESTIONS[phase%WRITTEN_QUESTIONS.length];const answer=(index:number)=>{const value=index===q.best?100:index===((q.best+1)%q.choices.length)?60:25;const [ns,nl]=add(`Question ${phase+1}`,value);if(phase>=2)finish(ns,nl);else setPhase(v=>v+1)};return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">WRITTEN EXAM · QUESTION {phase+1}/3</span><h3>{title}</h3><p>Judgment matters more than speed.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-event-progress"><i style={{width:`${phase/3*100}%`}}/></div><div className="activity-stage"><h4>{q.q}</h4><div className="tactic-options">{q.choices.map((choice,index)=><button className="btn secondary" key={choice} onClick={()=>answer(index)}>{choice}</button>)}</div></div></div></div>}
+  if(stage==='survival'&&phase<FOREST_CHOICES.length){const part=FOREST_CHOICES[phase];const choose=(value:number)=>{add(part.name,value);if(phase>=FOREST_CHOICES.length-1){setPhase(v=>v+1);setChallenge({kind:'mission',label:'Forest Extraction',difficulty:clamp(difficulty+8,30,95)})}else setPhase(v=>v+1)};return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">SURVIVAL EXERCISE · {phase+1}/4</span><h3>Forest of Trial</h3><p>Your earlier decisions carry into the extraction run.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-forest-card"><span>{part.name.toUpperCase()}</span><h4>{part.prompt}</h4><div className="mission-route-grid">{part.choices.map(([label,value])=><button key={label} onClick={()=>choose(value)}><strong>{label}</strong><small>{value>=90?'Disciplined':value>=60?'Risky':'Reckless'} approach</small></button>)}</div></div></div></div>}
+  if(stage==='preliminaries')return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">PRELIMINARY BATTLE</span><h3>Select Your Opponent</h3><p>Manage health and chakra, select jutsu, defend, counter, and adapt turn by turn.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-opponents">{OPPONENTS.map(op=><button key={op.name} onClick={()=>setCombat({label:`Bout vs ${op.name}`,opponent:op,difficulty:clamp(difficulty+op.mod,35,96)})}><strong>{op.name}</strong><span>{op.style}</span><small>{op.detail}</small></button>)}</div></div></div>;
+  if(stage==='finals'){const bout=phase===0?'Semifinal':'Championship Final';const opponent=phase===0?OPPONENTS[1]:OPPONENTS[2];return <div className="activity-overlay"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">FINAL TOURNAMENT</span><h3>{bout}</h3><p>Win both full tactical battles to complete the tournament bracket.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-bracket"><div className={phase===0?'active':'done'}><span>SEMIFINAL</span><strong>{scores[0]!==undefined?`Cleared · ${scores[0]}`:opponent.name}</strong></div><div className={phase===1?'active':''}><span>FINAL</span><strong>{phase===1?OPPONENTS[2].name:'Locked'}</strong></div></div><div className="exam-fight-card"><strong>{opponent.name} · {opponent.style}</strong><p>{opponent.detail}</p><button className="btn primary" onClick={()=>setCombat({label:bout,opponent,difficulty:clamp(difficulty+(phase===0?5:12),40,98)})}>Enter {bout}</button></div></div></div>}
   return null;
 }
 

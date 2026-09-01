@@ -1,5 +1,16 @@
 # Changelog
 
+## V11.5.4 — Tactical Combat Encounters
+
+- Added turn-based tactical battles with HP and chakra resources.
+- Added Strike, Guard/Counter, Focus Chakra, and Jutsu actions.
+- Connected combat damage to effective stats, training bonuses, equipment bonuses, jutsu rank, and mastery.
+- Added distinct pressure, control, and adaptive opponent AI behavior.
+- Replaced preliminary and final exam execution wrappers with full combat encounters.
+- Preserved server-authoritative Chūnin advancement, qualification, season points, and rewards.
+- No Supabase schema change; expected schema remains V11.4.0.
+
+
 ## V11.5.3 — Chūnin Exam Event Upgrade
 - Replaced generic exam-stage mini-games with a playable multi-part Chūnin Exam event.
 - Added a three-question written judgment examination.

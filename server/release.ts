@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export const APP_VERSION = '11.5.3';
+export const APP_VERSION = '11.5.4';
 export const EXPECTED_SCHEMA_VERSION = '11.4.0';
 export const RELEASE_CHANNEL = process.env.RELEASE_CHANNEL?.trim() || (process.env.NODE_ENV === 'production' ? 'production' : 'development');
 export const BUILD_COMMIT = (process.env.RENDER_GIT_COMMIT || process.env.BUILD_COMMIT || process.env.GIT_COMMIT || 'local').trim();
