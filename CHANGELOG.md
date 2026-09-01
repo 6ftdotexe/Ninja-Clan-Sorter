@@ -1,5 +1,18 @@
 # Changelog
 
+## V11.4.0 — Bingo Book hotfix
+- Fixed the public Bingo Book layout colliding with the Chronicle dossier `.bingo-grid` styles.
+- Added defensive normalization for public Bingo Book RPC rows.
+- Prevented malformed/null threat classes, bounties, or public slugs from crashing the page.
+- Improved mobile layout for public Bingo Book cards.
+
+
+## V11.4.0 Schema Hotfix
+
+- Fixed rerunning `supabase/schema.sql` from older V10/V11 databases when `join_village(uuid,text)` already exists with the legacy `jsonb` return type.
+- The schema now explicitly drops the legacy function signature before recreating the canonical `public.village_memberships`-returning RPC.
+- Kept the deployed release contract at `11.4.0`; this is a migration/idempotency correction only.
+
 ## V11.4.0 — Phase 5: Cooperative Missions & Village Wars
 
 - Added persistent cooperative squad operations for D/C/B/A/S ranks.

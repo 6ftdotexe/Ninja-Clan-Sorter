@@ -2373,7 +2373,7 @@ begin
 
   select count(*) into v_member_count from public.shinobi_team_members where team_id=p_team_id;
   if v_member_count<2 then raise exception 'Cooperative operations require at least two squad members.'; end if;
-  if exists(select 1 from public.shinobi_team_operations where team_id=p_team_id and rank=p_rank and operation_day=current_date) then raise exception 'This squad has already completed its %-Rank operation for today.', p_rank; end if;
+  if exists(select 1 from public.shinobi_team_operations where team_id=p_team_id and rank=p_rank and operation_day=current_date) then raise exception 'This squad has already completed its '||p_rank||'-Rank operation for today.'; end if;
 
   select count(*),coalesce(avg(coalesce(p.level,1)),1),coalesce(avg(coalesce(p.completed_missions,0)),0),
          coalesce(sum((select coalesce(sum(value::int),0) from jsonb_each_text(coalesce(p.training_bonuses,'{}'::jsonb)))),0)

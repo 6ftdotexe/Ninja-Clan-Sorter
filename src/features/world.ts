@@ -87,8 +87,35 @@ export async function renounceRogueStatus(characterId:string){
   return unwrapMaybe<boolean>(await requireSupabase().rpc('renounce_rogue_status',{p_character_id:characterId}));
 }
 
+const THREAT_CLASSES=new Set(['D','C','B','A','S']);
+
+function normalizeBingoEntry(value:unknown):BingoBookEntry|null{
+  if(!value||typeof value!=='object')return null;
+  const row=value as Record<string,unknown>;
+  const characterId=typeof row.character_id==='string'?row.character_id:'';
+  const slug=typeof row.public_slug==='string'?row.public_slug.trim():'';
+  if(!characterId||!slug)return null;
+  const rawThreat=typeof row.threat_class==='string'?row.threat_class.toUpperCase():'D';
+  const threat=(THREAT_CLASSES.has(rawThreat)?rawThreat:'D') as BingoBookEntry['threat_class'];
+  return {
+    character_id:characterId,
+    name:typeof row.name==='string'&&row.name.trim()?row.name.trim():'Unknown Shinobi',
+    public_slug:slug,
+    portrait_url:typeof row.portrait_url==='string'&&row.portrait_url.trim()?row.portrait_url:null,
+    clan:typeof row.clan==='string'&&row.clan.trim()?row.clan:null,
+    chakra_primary:typeof row.chakra_primary==='string'&&row.chakra_primary.trim()?row.chakra_primary:null,
+    rank:typeof row.rank==='string'&&row.rank.trim()?row.rank:null,
+    threat_class:threat,
+    bounty:Math.max(0,number(row.bounty)),
+    notoriety:Math.max(0,number(row.notoriety)),
+    rogue_title:typeof row.rogue_title==='string'&&row.rogue_title.trim()?row.rogue_title.trim():'Missing-nin',
+    last_known_village:isVillageId(row.last_known_village)?row.last_known_village:null,
+    rogue_since:typeof row.rogue_since==='string'?row.rogue_since:'',
+  };
+}
+
 export async function listPublicBingoBook(limit=30):Promise<BingoBookEntry[]>{
   if(!supabase)return[];
-  const rows=unwrapMaybe<BingoBookEntry[]>(await supabase.rpc('list_public_bingo_book',{p_limit:Math.min(50,Math.max(1,limit))}));
-  return Array.isArray(rows)?rows:[];
+  const payload=unwrapMaybe<unknown>(await supabase.rpc('list_public_bingo_book',{p_limit:Math.min(50,Math.max(1,limit))}));
+  return (Array.isArray(payload)?payload:[]).map(normalizeBingoEntry).filter((entry):entry is BingoBookEntry=>Boolean(entry));
 }
