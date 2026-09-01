@@ -1,5 +1,12 @@
 # Changelog
 
+## V11.5.2 — Multi-Stage Mission Adventures
+- Replaced the single mission mini-game with a three-stage mission run: Infiltration, Objective, and Extraction.
+- Added route choices with persistent risk/reward modifiers.
+- Added stage map/progress UI and final mission debrief.
+- Preserved the V11.4.0 database schema; this is an application-only update.
+
+
 ## V11.5.1 — Activity-Specific Mini-Game Refinement
 
 - Replaced the shared three-drill sequence with activity-specific mini-game plans.

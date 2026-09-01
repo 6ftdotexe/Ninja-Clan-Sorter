@@ -127,6 +127,67 @@ export function ActivityChallenge({kind,title,difficulty=55,focus,onComplete,onC
   </div>;
 }
 
+
+export type MissionAdventureResult={score:number;passed:boolean;stageScores:number[];route:string[]};
+
+type MissionAdventureProps={
+  title:string;
+  difficulty?:number;
+  objective:string;
+  location?:string;
+  onComplete:(result:MissionAdventureResult)=>void|Promise<void>;
+  onCancel:()=>void;
+};
+
+type MissionStageChoice={label:string;detail:string;risk:number;bonus:number;kind:ActivityKind};
+type MissionStage={name:string;brief:string;choices:MissionStageChoice[]};
+
+const MISSION_STAGES:MissionStage[]=[
+  {name:'Infiltration',brief:'Choose how to approach the mission zone without losing the initiative.',choices:[
+    {label:'Silent Route',detail:'Lower risk, cleaner approach, smaller score ceiling.',risk:-8,bonus:0,kind:'mission'},
+    {label:'High Ground',detail:'Balanced route with better field visibility.',risk:0,bonus:4,kind:'training'},
+    {label:'Direct Breach',detail:'Fast and dangerous. Strong execution earns a larger bonus.',risk:10,bonus:10,kind:'war'},
+  ]},
+  {name:'Objective',brief:'The target is in reach. Decide how you will secure the mission objective.',choices:[
+    {label:'Precision',detail:'Controlled technique execution with minimal collateral risk.',risk:-4,bonus:3,kind:'mastery'},
+    {label:'Tactical Control',detail:'Read the field and solve the objective through positioning.',risk:2,bonus:6,kind:'exam'},
+    {label:'Overwhelming Push',detail:'Maximum pressure. Harder execution, highest potential payoff.',risk:12,bonus:12,kind:'team'},
+  ]},
+  {name:'Extraction',brief:'The objective is secured. Get out before the field closes around you.',choices:[
+    {label:'Disappear',detail:'Break contact and leave no trail.',risk:-6,bonus:2,kind:'mission'},
+    {label:'Protective Withdrawal',detail:'Safer for allies and civilians, but requires coordination.',risk:3,bonus:6,kind:'team'},
+    {label:'Counter Pursuit',detail:'Turn the escape into a final counterattack.',risk:14,bonus:14,kind:'world'},
+  ]},
+];
+
+export function MissionAdventure({title,difficulty=55,objective,location,onComplete,onCancel}:MissionAdventureProps){
+  const [stageIndex,setStageIndex]=useState(0);
+  const [choice,setChoice]=useState<MissionStageChoice|null>(null);
+  const [scores,setScores]=useState<number[]>([]);
+  const [route,setRoute]=useState<string[]>([]);
+  const [finished,setFinished]=useState(false);
+  const stage=MISSION_STAGES[stageIndex];
+  const finalScore=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;
+  const passMark=threshold(difficulty);
+  const finishStage=async(result:ActivityResult)=>{
+    if(!choice)return;
+    const adjusted=clamp(result.score+choice.bonus-Math.max(0,choice.risk*.25));
+    const nextScores=[...scores,Math.round(adjusted)];
+    const nextRoute=[...route,choice.label];
+    setScores(nextScores);setRoute(nextRoute);setChoice(null);
+    if(stageIndex>=MISSION_STAGES.length-1){setFinished(true);return;}
+    setStageIndex(v=>v+1);
+  };
+  if(choice&&!finished){
+    return <ActivityChallenge kind={choice.kind} title={`${title} · ${stage.name}`} difficulty={clamp(difficulty+choice.risk,25,95)} focus={`${stage.brief} Route: ${choice.label}. ${choice.detail}`} onCancel={()=>setChoice(null)} onComplete={finishStage}/>;
+  }
+  return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel mission-adventure">
+    <div className="activity-head"><div><span className="eyebrow">MULTI-STAGE MISSION</span><h3>{title}</h3><p>{location?`${location} · `:''}{objective}</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div>
+    {!finished&&<><div className="mission-map">{MISSION_STAGES.map((item,index)=><div key={item.name} className={index<stageIndex?'complete':index===stageIndex?'active':''}><span>{index+1}</span><strong>{item.name}</strong><small>{scores[index]!==undefined?`${scores[index]} pts`:index===stageIndex?'ACTIVE':'LOCKED'}</small></div>)}</div><div className="mission-stage-choice"><span className="eyebrow">STAGE {stageIndex+1} / {MISSION_STAGES.length}</span><h3>{stage.name}</h3><p>{stage.brief}</p><div className="mission-route-grid">{stage.choices.map(option=><button key={option.label} onClick={()=>setChoice(option)}><strong>{option.label}</strong><span>{option.detail}</span><small>{option.risk>0?`Risk +${option.risk}`:`Risk ${option.risk}`} · Bonus +${option.bonus}</small></button>)}</div></div></>}
+    {finished&&<div className={`activity-result ${finalScore>=passMark?'passed':'failed'}`}><span className="eyebrow">MISSION DEBRIEF</span><strong>{finalScore}</strong><h3>{finalScore>=passMark?'Mission Success':'Mission Failed'}</h3><p className="muted">Required score: {Math.round(passMark)}. Your route choices carried forward across all three stages.</p><div className="activity-rounds">{MISSION_STAGES.map((item,index)=><span key={item.name}>{item.name}: {route[index]} · {scores[index]??0}</span>)}</div><button className="btn primary" onClick={()=>void onComplete({score:finalScore,passed:finalScore>=passMark,stageScores:scores,route})}>{finalScore>=passMark?'Complete Mission':'Record Failure'}</button></div>}
+  </div></div>;
+}
+
 function TimingRound({spec,difficulty,onDone}:{spec:RoundSpec;difficulty:number;onDone:(score:number)=>void}){
   const [marker,setMarker]=useState(0);
   const [direction,setDirection]=useState(1);
