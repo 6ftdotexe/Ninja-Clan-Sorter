@@ -1,5 +1,20 @@
 # Changelog
 
+## V11.4.0 — Phase 5: Cooperative Missions & Village Wars
+
+- Added persistent cooperative squad operations for D/C/B/A/S ranks.
+- Added server-authoritative squad scoring based on team size, owned-shinobi level, mission experience, and training investment.
+- Added squad operation history, contribution scores, daily per-rank deployment limits, and progression rewards for owned squad members.
+- Added `/operations` with rank selection, deployment controls, rewards, and field history.
+- Added the first persistent village-war season, `Five Kage Front`.
+- Added one village-war deployment per squad per day.
+- Required village-war squads to contain at least two owned shinobi formally serving the same village.
+- Added public village-war standings with war points, victories, deployment counts, and ranks.
+- Added `/wars` with live standings, squad deployment, and personal deployment history.
+- Connected village-war success to Training Points, ryō, and village reputation.
+- Added Phase 5 tables, indexes, RLS boundaries, authenticated deployment RPCs, public standings RPCs, and regression schema contracts.
+- Bumped application, frontend, server, and Supabase schema to 11.4.0.
+
 ## V11.3.0 — Phase 4: Dynamic World Events & Rogue Shinobi
 
 - Added persistent active world events and event participation.

@@ -2292,8 +2292,281 @@ revoke all on function public.join_village(uuid,text) from public,anon;
 grant execute on function public.join_village(uuid,text) to authenticated;
 
 -- ============================================================================
--- Release metadata — V11.3.0+
+-- V11 Phase 5 — Cooperative Team Operations & Village Wars
+-- ============================================================================
+
+create table if not exists public.shinobi_team_operations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  team_id uuid not null references public.shinobi_teams(id) on delete cascade,
+  rank text not null check (rank in ('D','C','B','A','S')),
+  title text not null,
+  objective text not null,
+  score integer not null default 0,
+  success boolean not null default false,
+  contribution integer not null default 0,
+  rewards jsonb not null default '{}'::jsonb,
+  operation_day date not null default current_date,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz not null default now()
+);
+create index if not exists shinobi_team_operations_team_idx on public.shinobi_team_operations(team_id,created_at desc);
+create unique index if not exists shinobi_team_operations_daily_rank_idx on public.shinobi_team_operations(team_id,rank,operation_day);
+create index if not exists shinobi_team_operations_user_idx on public.shinobi_team_operations(user_id,created_at desc);
+alter table public.shinobi_team_operations enable row level security;
+drop policy if exists "Users can view own team operations" on public.shinobi_team_operations;
+create policy "Users can view own team operations" on public.shinobi_team_operations for select using(auth.uid()=user_id);
+revoke insert,update,delete on public.shinobi_team_operations from anon,authenticated;
+
+
+create or replace function public.list_team_operations(p_team_id uuid)
+returns setof public.shinobi_team_operations
+language sql
+security definer
+set search_path=public
+stable
+as $$
+  select o.* from public.shinobi_team_operations o
+  join public.shinobi_teams t on t.id=o.team_id
+  where o.team_id=p_team_id and t.user_id=auth.uid()
+  order by o.created_at desc limit 30;
+$$;
+revoke all on function public.list_team_operations(uuid) from public,anon;
+grant execute on function public.list_team_operations(uuid) to authenticated;
+
+create or replace function public.deploy_team_operation(p_team_id uuid,p_rank text)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  v_user uuid:=auth.uid();
+  v_team public.shinobi_teams%rowtype;
+  v_member_count integer;
+  v_owned_count integer;
+  v_avg_level numeric;
+  v_avg_missions numeric;
+  v_training integer;
+  v_score integer;
+  v_threshold integer;
+  v_success boolean;
+  v_xp integer;
+  v_rep integer;
+  v_tp integer;
+  v_ryo integer;
+  v_contribution integer;
+  v_title text;
+  v_objective text;
+  v_row public.shinobi_team_operations%rowtype;
+  r record;
+begin
+  if v_user is null then raise exception 'Authentication required.'; end if;
+  if p_rank not in ('D','C','B','A','S') then raise exception 'Unknown operation rank.'; end if;
+  select * into v_team from public.shinobi_teams where id=p_team_id and user_id=v_user;
+  if not found then raise exception 'Squad not found.'; end if;
+
+  select count(*) into v_member_count from public.shinobi_team_members where team_id=p_team_id;
+  if v_member_count<2 then raise exception 'Cooperative operations require at least two squad members.'; end if;
+  if exists(select 1 from public.shinobi_team_operations where team_id=p_team_id and rank=p_rank and operation_day=current_date) then raise exception 'This squad has already completed its '||p_rank||'-Rank operation for today.'; end if;
+
+  select count(*),coalesce(avg(coalesce(p.level,1)),1),coalesce(avg(coalesce(p.completed_missions,0)),0),
+         coalesce(sum((select coalesce(sum(value::int),0) from jsonb_each_text(coalesce(p.training_bonuses,'{}'::jsonb)))),0)
+  into v_owned_count,v_avg_level,v_avg_missions,v_training
+  from public.shinobi_team_members tm
+  join public.shinobi_characters c on c.id=tm.character_id
+  left join public.shinobi_progression p on p.character_id=c.id
+  where tm.team_id=p_team_id and c.user_id=v_user;
+  if v_owned_count<1 then raise exception 'At least one squad member must belong to your archive.'; end if;
+
+  if p_rank='C' and v_avg_level<4 then raise exception 'C-Rank operations require an average owned-shinobi level of 4.'; end if;
+  if p_rank='B' and v_avg_level<8 then raise exception 'B-Rank operations require an average owned-shinobi level of 8.'; end if;
+  if p_rank='A' and v_avg_level<14 then raise exception 'A-Rank operations require an average owned-shinobi level of 14.'; end if;
+  if p_rank='S' and v_avg_level<22 then raise exception 'S-Rank operations require an average owned-shinobi level of 22.'; end if;
+
+  v_score:=least(120,greatest(1,round(v_avg_level*4+v_avg_missions*1.5+least(30,v_training/2.0)+v_member_count*8+(abs(hashtext(p_team_id::text||p_rank||current_date::text))%21))::integer));
+  v_threshold:=case p_rank when 'D' then 35 when 'C' then 50 when 'B' then 65 when 'A' then 80 else 95 end;
+  v_success:=v_score>=v_threshold;
+  v_xp:=case p_rank when 'D' then 100 when 'C' then 180 when 'B' then 340 when 'A' then 600 else 1000 end;
+  v_rep:=case p_rank when 'D' then 10 when 'C' then 18 when 'B' then 28 when 'A' then 45 else 70 end;
+  v_tp:=case p_rank when 'D' then 2 when 'C' then 3 when 'B' then 5 when 'A' then 8 else 12 end;
+  v_ryo:=case p_rank when 'D' then 90 when 'C' then 180 when 'B' then 320 when 'A' then 600 else 1000 end;
+  if not v_success then v_xp:=greatest(20,v_xp/4);v_rep:=0;v_tp:=1;v_ryo:=greatest(30,v_ryo/3);end if;
+  v_contribution:=case when v_success then greatest(15,v_score-v_threshold+20) else greatest(4,v_score/12) end;
+  v_title:=case p_rank when 'D' then 'Supply Line Sweep' when 'C' then 'Border Escort' when 'B' then 'Hostile Cell Interdiction' when 'A' then 'Deep Territory Extraction' else 'Strategic Threat Suppression' end;
+  v_objective:=case p_rank when 'D' then 'Coordinate the squad to secure a contested logistics route.' when 'C' then 'Protect a high-value convoy through unstable territory.' when 'B' then 'Locate and neutralize a coordinated hostile shinobi cell.' when 'A' then 'Extract an intelligence asset from defended enemy territory.' else 'Defeat a strategic threat that requires full-squad synchronization.' end;
+
+  for r in select c.id from public.shinobi_team_members tm join public.shinobi_characters c on c.id=tm.character_id where tm.team_id=p_team_id and c.user_id=v_user loop
+    insert into public.shinobi_progression(character_id,user_id) values(r.id,v_user) on conflict(character_id) do nothing;
+    update public.shinobi_progression set
+      xp=xp+v_xp,
+      level=greatest(1,floor(sqrt((xp+v_xp)::numeric/70.0))::integer+1),
+      village_reputation=village_reputation+v_rep,
+      training_points=training_points+v_tp,
+      ryo=ryo+v_ryo,
+      updated_at=now()
+    where character_id=r.id and user_id=v_user;
+  end loop;
+
+  insert into public.shinobi_team_operations(user_id,team_id,rank,title,objective,score,success,contribution,rewards)
+  values(v_user,p_team_id,p_rank,v_title,v_objective,v_score,v_success,v_contribution,
+    jsonb_build_object('xp',v_xp,'reputation',v_rep,'training_points',v_tp,'ryo',v_ryo))
+  returning * into v_row;
+  return jsonb_build_object('operation',to_jsonb(v_row),'team_score',v_score,'success',v_success,
+    'rewarded_characters',v_owned_count,'message',case when v_success then 'Squad operation completed successfully.' else 'The squad withdrew after a difficult operation, but gained field experience.' end);
+end;
+$$;
+revoke all on function public.deploy_team_operation(uuid,text) from public,anon;
+grant execute on function public.deploy_team_operation(uuid,text) to authenticated;
+
+create table if not exists public.village_war_seasons (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null unique,
+  name text not null,
+  status text not null default 'upcoming' check(status in ('upcoming','active','completed')),
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  check(ends_at>starts_at)
+);
+
+create table if not exists public.village_war_deployments (
+  id uuid primary key default gen_random_uuid(),
+  season_id uuid not null references public.village_war_seasons(id) on delete cascade,
+  team_id uuid not null references public.shinobi_teams(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  village_id text not null check(village_id in ('Konohagakure','Sunagakure','Kumogakure','Iwagakure','Kirigakure')),
+  score integer not null default 0,
+  success boolean not null default false,
+  war_points integer not null default 0 check(war_points>=0),
+  deployment_day date not null default current_date,
+  created_at timestamptz not null default now(),
+  unique(season_id,team_id,deployment_day)
+);
+create index if not exists village_war_deployments_season_idx on public.village_war_deployments(season_id,village_id,war_points desc);
+create index if not exists village_war_deployments_user_idx on public.village_war_deployments(user_id,created_at desc);
+alter table public.village_war_seasons enable row level security;
+alter table public.village_war_deployments enable row level security;
+drop policy if exists "Public can view village war seasons" on public.village_war_seasons;
+create policy "Public can view village war seasons" on public.village_war_seasons for select using(true);
+drop policy if exists "Users can view own village war deployments" on public.village_war_deployments;
+create policy "Users can view own village war deployments" on public.village_war_deployments for select using(auth.uid()=user_id);
+revoke insert,update,delete on public.village_war_seasons from anon,authenticated;
+revoke insert,update,delete on public.village_war_deployments from anon,authenticated;
+
+insert into public.village_war_seasons(slug,name,status,starts_at,ends_at)
+values('five-kage-front','Five Kage Front','active',now()-interval '1 day',now()+interval '90 days')
+on conflict(slug) do nothing;
+
+create or replace function public.get_active_village_war()
+returns public.village_war_seasons
+language sql
+security definer
+set search_path=public
+stable
+as $$
+  select * from public.village_war_seasons where status='active' and starts_at<=now() and ends_at>now() order by starts_at desc limit 1;
+$$;
+revoke all on function public.get_active_village_war() from public;
+grant execute on function public.get_active_village_war() to anon,authenticated;
+
+create or replace function public.list_village_war_standings()
+returns jsonb
+language sql
+security definer
+set search_path=public
+stable
+as $$
+  with active as (select id from public.village_war_seasons where status='active' and starts_at<=now() and ends_at>now() order by starts_at desc limit 1),
+  villages(village_id) as (values ('Konohagakure'),('Sunagakure'),('Kumogakure'),('Iwagakure'),('Kirigakure')),
+  totals as (
+    select v.village_id,coalesce(sum(d.war_points),0)::int war_points,
+      count(*) filter(where d.success)::int victories,count(d.id)::int deployments
+    from villages v left join active a on true left join public.village_war_deployments d on d.season_id=a.id and d.village_id=v.village_id
+    group by v.village_id
+  ), ranked as (select *,dense_rank() over(order by war_points desc,victories desc,village_id)::int as rank from totals)
+  select coalesce(jsonb_agg(to_jsonb(ranked) order by rank,village_id),'[]'::jsonb) from ranked;
+$$;
+revoke all on function public.list_village_war_standings() from public;
+grant execute on function public.list_village_war_standings() to anon,authenticated;
+
+create or replace function public.list_my_village_war_deployments(p_team_id uuid default null)
+returns setof public.village_war_deployments
+language sql
+security definer
+set search_path=public
+stable
+as $$
+  select d.* from public.village_war_deployments d
+  where d.user_id=auth.uid() and (p_team_id is null or d.team_id=p_team_id)
+  order by d.created_at desc limit 40;
+$$;
+revoke all on function public.list_my_village_war_deployments(uuid) from public,anon;
+grant execute on function public.list_my_village_war_deployments(uuid) to authenticated;
+
+create or replace function public.deploy_village_war_team(p_team_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  v_user uuid:=auth.uid();
+  v_season public.village_war_seasons%rowtype;
+  v_village text;
+  v_owned integer;
+  v_village_count integer;
+  v_avg_level numeric;
+  v_missions numeric;
+  v_training integer;
+  v_score integer;
+  v_success boolean;
+  v_points integer;
+  v_row public.village_war_deployments%rowtype;
+  r record;
+begin
+  if v_user is null then raise exception 'Authentication required.'; end if;
+  if not exists(select 1 from public.shinobi_teams where id=p_team_id and user_id=v_user) then raise exception 'Squad not found.'; end if;
+  select * into v_season from public.village_war_seasons where status='active' and starts_at<=now() and ends_at>now() order by starts_at desc limit 1;
+  if not found then raise exception 'No village war is active.'; end if;
+  if exists(select 1 from public.village_war_deployments where season_id=v_season.id and team_id=p_team_id and deployment_day=current_date) then raise exception 'This squad has already deployed to the village war today.'; end if;
+
+  select count(*),count(distinct vm.village_id),min(vm.village_id),coalesce(avg(p.level),1),coalesce(avg(p.completed_missions),0),
+    coalesce(sum((select coalesce(sum(value::int),0) from jsonb_each_text(coalesce(p.training_bonuses,'{}'::jsonb)))),0)
+  into v_owned,v_village_count,v_village,v_avg_level,v_missions,v_training
+  from public.shinobi_team_members tm
+  join public.shinobi_characters c on c.id=tm.character_id and c.user_id=v_user
+  join public.village_memberships vm on vm.character_id=c.id and vm.user_id=v_user
+  left join public.shinobi_progression p on p.character_id=c.id
+  where tm.team_id=p_team_id;
+  if v_owned<2 then raise exception 'Village war deployment requires at least two of your own village shinobi in the squad.'; end if;
+  if v_village_count<>1 then raise exception 'All deployed owned shinobi must serve the same village.'; end if;
+
+  v_score:=least(130,greatest(1,round(v_avg_level*4+v_missions*1.5+least(35,v_training/2.0)+v_owned*10+(abs(hashtext(v_season.id::text||p_team_id::text||current_date::text))%26))::integer));
+  v_success:=v_score>=72;
+  v_points:=case when v_success then greatest(25,v_score-35) else greatest(8,v_score/8) end;
+
+  insert into public.village_war_deployments(season_id,team_id,user_id,village_id,score,success,war_points)
+  values(v_season.id,p_team_id,v_user,v_village,v_score,v_success,v_points)
+  returning * into v_row;
+
+  for r in select c.id from public.shinobi_team_members tm join public.shinobi_characters c on c.id=tm.character_id and c.user_id=v_user join public.village_memberships vm on vm.character_id=c.id and vm.user_id=v_user and vm.village_id=v_village where tm.team_id=p_team_id loop
+    update public.shinobi_progression set training_points=training_points+case when v_success then 3 else 1 end,
+      ryo=ryo+case when v_success then 300 else 100 end,
+      village_reputation=village_reputation+case when v_success then 20 else 5 end,
+      updated_at=now() where character_id=r.id and user_id=v_user;
+  end loop;
+
+  return jsonb_build_object('deployment',to_jsonb(v_row),'score',v_score,'success',v_success,'war_points',v_points,
+    'message',case when v_success then v_village||' secured a successful war deployment.' else v_village||' was pushed back, but the squad preserved field intelligence.' end);
+end;
+$$;
+revoke all on function public.deploy_village_war_team(uuid) from public,anon;
+grant execute on function public.deploy_village_war_team(uuid) to authenticated;
+
+-- ============================================================================
+-- Release metadata — V11.4.0+
 -- ============================================================================
 insert into public.app_release_metadata(key,value,updated_at)
-values('schema_version','11.3.0',now())
+values('schema_version','11.4.0',now())
 on conflict(key) do update set value=excluded.value,updated_at=excluded.updated_at;

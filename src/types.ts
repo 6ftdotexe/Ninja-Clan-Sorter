@@ -80,3 +80,12 @@ export interface WorldEventParticipation{id:string;event_id:string;character_id:
 export interface WorldEventResult{participation:WorldEventParticipation;score:number;success:boolean;contribution:number;message:string}
 export interface RogueProfile{character_id:string;user_id:string;rogue_since:string;notoriety:number;bounty:number;threat_class:'D'|'C'|'B'|'A'|'S';rogue_title:string;last_known_village:VillageId|null;updated_at:string}
 export interface BingoBookEntry{character_id:string;name:string;public_slug:string;portrait_url:string|null;clan:string|null;chakra_primary:string|null;rank:string|null;threat_class:'D'|'C'|'B'|'A'|'S';bounty:number;notoriety:number;rogue_title:string;last_known_village:VillageId|null;rogue_since:string}
+
+
+// V11 Phase 5 — cooperative team operations and village wars.
+export interface TeamOperation{id:string;user_id:string;team_id:string;rank:MissionRank;title:string;objective:string;score:number;success:boolean;contribution:number;rewards:{xp:number;reputation:number;training_points:number;ryo:number};created_at:string;completed_at:string}
+export interface TeamOperationResult{operation:TeamOperation;team_score:number;success:boolean;message:string;rewarded_characters:number}
+export interface VillageWarSeason{id:string;slug:string;name:string;status:'upcoming'|'active'|'completed';starts_at:string;ends_at:string;created_at:string}
+export interface VillageWarStanding{village_id:VillageId;war_points:number;victories:number;deployments:number;rank:number}
+export interface VillageWarDeployment{id:string;season_id:string;team_id:string;user_id:string;village_id:VillageId;score:number;success:boolean;war_points:number;created_at:string}
+export interface VillageWarResult{deployment:VillageWarDeployment;score:number;success:boolean;war_points:number;message:string}

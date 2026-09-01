@@ -245,3 +245,10 @@ V10.5.0 adds HashRouter-safe Stripe returns, production HSTS/API no-store behavi
 Phase 4 keeps world-state logic inside the existing `world` feature boundary. `shinobi_world_events` describes active incidents, `shinobi_world_event_participation` records one authoritative result per character/event, and `rogue_shinobi_profiles` stores missing-nin status separately from village membership. Server-authoritative RPCs resolve participation rewards and rogue notoriety. Public Bingo Book reads return whitelisted public character fields only.
 
 Routes: `/world`, `/rogue`, `/bingo-book`.
+
+
+## V11 Phase 5 cooperative warfare layer
+
+Phase 5 keeps social warfare in a compact `warfare` feature boundary. `shinobi_team_operations` stores server-resolved cooperative squad deployments, while `village_war_seasons` and `village_war_deployments` provide a persistent cross-village seasonal competition. Team operations may use the full squad for composition but only owned characters receive progression rewards. Village-war deployments require at least two owned characters with one shared formal village allegiance, preventing users from committing another player's public character to a village war. Public war standings are aggregate-only and expose no account ownership data.
+
+The Phase 5 routes are `/operations` and `/wars`; both reuse the existing consolidated SocialPages UI module and shared social navigation to avoid re-expanding the route-file structure.

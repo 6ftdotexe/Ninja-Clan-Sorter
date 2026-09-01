@@ -25,9 +25,10 @@ export function ProgressBar({value,className='progress'}:{value:number;className
   return <div className={className}><i style={{width:`${pct}%`}}/></div>;
 }
 
-export function SocialTabs({active}:{active:'teams'|'rivals'|'matchups'}){
+export function SocialTabs({active}:{active:'teams'|'rivals'|'matchups'|'operations'|'wars'}){
   const navigate=useNavigate();
-  return <div className="social-tabs">{(['teams','rivals','matchups'] as const).map(tab=><button key={tab} className={active===tab?'active':undefined} onClick={()=>navigate(`/${tab}`)}>{tab[0].toUpperCase()+tab.slice(1)}</button>)}</div>;
+  const tabs=[['teams','Teams'],['rivals','Rivals'],['matchups','Matchups'],['operations','Co-op'],['wars','Wars']] as const;
+  return <div className="social-tabs">{tabs.map(([tab,label])=><button key={tab} className={active===tab?'active':undefined} onClick={()=>navigate(`/${tab}`)}>{label}</button>)}</div>;
 }
 
 export function FormField({label,count,children}:{label:ReactNode;count?:ReactNode;children:ReactNode}){

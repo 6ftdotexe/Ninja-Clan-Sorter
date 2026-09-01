@@ -470,10 +470,10 @@ GET /api/version
 Expected release contract:
 
 ```text
-Application: 11.3.0
-Server:      11.3.0
-Frontend:    11.3.0
-Schema:      11.3.0
+Application: 11.4.0
+Server:      11.4.0
+Frontend:    11.4.0
+Schema:      11.4.0
 ```
 
 ### Diagnostics
@@ -486,13 +486,13 @@ If `DIAGNOSTICS_TOKEN` is configured, the protected internal snapshot remains av
 Re-run `supabase/schema.sql` before deploying the V11.2.0 application. The schema adds competitive seasons, Chūnin Exam entries, competitive records, exam RPCs, and the public seasonal leaderboard.
 
 
-## V11.3.0 Phase 4 upgrade
+## V11.4.0 Phase 5 upgrade
 
-Re-run `supabase/schema.sql` before deploying V11.3.0. Phase 4 adds world events, event participation, rogue profiles, missing-nin career RPCs, and the public Bingo Book. Production startup expects schema version `11.3.0`.
+Re-run `supabase/schema.sql` before deploying V11.4.0. Phase 5 adds cooperative team operations, persistent village-war seasons/deployments, public war standings, and server-authoritative squad deployment RPCs. Production startup expects schema version `11.4.0`.
 
 Recommended rollout:
 1. Run the current `supabase/schema.sql`.
 2. Run `npm install && npm run release:check`.
 3. Deploy the application with `npm start`.
 4. Verify `/api/health/ready` and `/api/version`.
-5. Confirm app/frontend/server/schema all report `11.3.0`.
+5. Confirm app/frontend/server/schema all report `11.4.0`.

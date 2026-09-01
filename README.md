@@ -1,14 +1,12 @@
 # Shinobi Identity Archive — V11
 
-V11 is the current major release of the Shinobi Identity Archive. Phase 2 turns the Living Shinobi World into a build-progression RPG layer: missions now fund training points and ryō, characters can permanently specialize stats, saved jutsu gain mastery levels, and equipment can be purchased and equipped per shinobi.
+V11 is the current major release of the Shinobi Identity Archive. Phase 5 turns squads and villages into shared operational systems: teams can deploy into cooperative missions, village-aligned squads can contribute to a persistent village-war season, and career/training progression feeds directly into team performance.
 
-## V11 Phase 4 — Dynamic World Events + Rogue Shinobi
+## V11 Phase 5 — Cooperative Missions + Village Wars
 
-V11.3.0 expands the Living Shinobi World with active world incidents, one-run-per-character event participation, rogue-shinobi careers, notoriety, bounties, evolving threat classes, and a privacy-safe public Bingo Book. Existing villages, careers, training, equipment, missions, and competitive seasons now feed into the same world-state loop.
+V11.4.0 adds `/operations` and `/wars`. Cooperative operations require multi-member squads and resolve from squad size plus owned-shinobi career/training progression. Successful operations reward every owned shinobi on the squad. Village wars add a public five-village seasonal leaderboard, daily same-village squad deployments, war points, victories, and progression rewards.
 
-The new `/training` route manages stat specialization and resources. `/arsenal` now includes jutsu mastery and an equipment inventory/catalog. Existing V10/V11 identity, village, mission, social, public-profile, generation, and chronicle systems remain intact.
-
-This release requires the V11.3.0 Supabase schema before deployment. Run `npm run release:check`, apply `supabase/schema.sql` first, deploy the application, then verify `/api/health/ready` and `/api/version`.
+This release requires the V11.4.0 Supabase schema before deployment. Run `npm run release:check`, apply `supabase/schema.sql` first, deploy the application, then verify `/api/health/ready` and `/api/version`.
 
 ## Documentation
 
@@ -127,6 +125,6 @@ For production rollouts, apply the current `supabase/schema.sql` first, deploy t
 Phase 3 adds Chūnin Exam registration, four server-authoritative exam stages, persistent competitive records, seasonal points, public leaderboards, qualification titles, and tournament rewards. New routes: `/exams` and `/seasons`.
 
 
-## V11 Phase 4
+## V11 Phase 5
 
-Phase 4 adds `/world`, `/rogue`, and `/bingo-book`. Active world events are public, but participation is authenticated and server-authoritative. Village and independent shinobi earn field rewards and reputation; missing-nin convert the same world pressure into notoriety and bounty growth. Rejoining a village clears active rogue status so allegiance remains singular.
+Phase 5 adds `/operations` and `/wars` on top of the existing Phase 4 world-state layer. Team operations reward owned squad members, while village-war deployments require at least two owned shinobi serving the same village and contribute to a public seasonal war leaderboard.

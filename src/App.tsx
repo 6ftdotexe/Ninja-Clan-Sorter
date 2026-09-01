@@ -21,6 +21,8 @@ const MissionsPage=lazy(()=>import('./pages/SystemPages').then(m=>({default:m.Mi
 const MatchupsPage=lazy(()=>import('./pages/SocialPages').then(m=>({default:m.MatchupsPage})));
 const RivalsPage=lazy(()=>import('./pages/SocialPages').then(m=>({default:m.RivalsPage})));
 const TeamsPage=lazy(()=>import('./pages/SocialPages').then(m=>({default:m.TeamsPage})));
+const CooperativeMissionsPage=lazy(()=>import('./pages/SocialPages').then(m=>({default:m.CooperativeMissionsPage})));
+const VillageWarsPage=lazy(()=>import('./pages/SocialPages').then(m=>({default:m.VillageWarsPage})));
 const VillagesPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.VillagesPage})));
 const VillagePage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.VillagePage})));
 const CareerPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.CareerPage})));
@@ -44,6 +46,8 @@ const mainNav = [
   ['/arsenal','Arsenal'],
   ['/missions','Missions'],
   ['/teams','Teams'],
+  ['/operations','Co-op'],
+  ['/wars','Wars'],
   ['/chronicle','Chronicle'],
 ] as const;
 
@@ -74,12 +78,12 @@ export function Layout(){
       </button>
       <div className="brand-actions">
         {mainNav.map(([path,label])=><button className="nav-chip" key={path} onClick={()=>navigate(path)}>{label}</button>)}
-        <span className="edition">V11 · PHASE 4</span>
+        <span className="edition">V11 · PHASE 5</span>
         {configured&&<button className="account-chip" onClick={()=>navigate(user?'/account':'/login')}>{user?'My Account':'Sign In'}</button>}
       </div>
     </header>
     <section className="card route-stage"><RouteErrorBoundary><Suspense fallback={<RouteFallback/>}><Outlet/></Suspense></RouteErrorBoundary></section>
-    <footer>Unofficial fan-made personality experience. React + TypeScript · V{__APP_VERSION__} · Identity, living villages, dynamic world events, rogue shinobi, training, jutsu mastery, equipment, competitive seasons, missions, social systems, and chronicle.</footer>
+    <footer>Unofficial fan-made personality experience. React + TypeScript · V{__APP_VERSION__} · Identity, living villages, team operations, village wars, dynamic world events, rogue shinobi, training, jutsu mastery, equipment, competitive seasons, missions, social systems, and chronicle.</footer>
   </main>;
 }
 
@@ -107,6 +111,8 @@ export default function App(){
     <Route path="/arsenal" element={<ArsenalPage/>}/>
     <Route path="/missions" element={<MissionsPage/>}/>
     <Route path="/teams" element={<TeamsPage/>}/>
+    <Route path="/operations" element={<CooperativeMissionsPage/>}/>
+    <Route path="/wars" element={<VillageWarsPage/>}/>
     <Route path="/rivals" element={<RivalsPage/>}/>
     <Route path="/matchups" element={<MatchupsPage/>}/>
     <Route path="/chronicle" element={<ChroniclePage/>}/>

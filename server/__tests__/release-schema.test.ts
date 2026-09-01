@@ -7,7 +7,7 @@ import { runPreflight } from '../preflight.js';
 describe('release contract', () => {
   it('keeps package.json aligned with the server release', async () => {
     await expect(verifyPackageVersion()).resolves.toBeUndefined();
-    expect(APP_VERSION).toBe('11.3.0');
+    expect(APP_VERSION).toBe('11.4.0');
   });
 
   it('ships the TypeScript runtime used by npm start as a production dependency', async () => {
@@ -16,8 +16,8 @@ describe('release contract', () => {
     expect(pkg.devDependencies?.tsx).toBeUndefined();
   });
 
-  it('expects the Phase 4 schema version', () => {
-    expect(EXPECTED_SCHEMA_VERSION).toBe('11.3.0');
+  it('expects the Phase 5 schema version', () => {
+    expect(EXPECTED_SCHEMA_VERSION).toBe('11.4.0');
   });
 
   it('reports a matching frontend/server/schema release contract', async () => {
@@ -82,6 +82,14 @@ describe('Supabase security/schema contracts', () => {
       'create or replace function public.become_rogue(',
       'create or replace function public.renounce_rogue_status(',
       'create or replace function public.list_public_bingo_book(',
+      'create table if not exists public.shinobi_team_operations',
+      'create or replace function public.deploy_team_operation(',
+      'create unique index if not exists shinobi_team_operations_daily_rank_idx',
+      'create table if not exists public.village_war_seasons',
+      'create table if not exists public.village_war_deployments',
+      'create or replace function public.get_active_village_war()',
+      'create or replace function public.list_village_war_standings()',
+      'create or replace function public.deploy_village_war_team(',
     ];
     for (const contract of required) expect(sql.toLowerCase()).toContain(contract.toLowerCase());
   });
