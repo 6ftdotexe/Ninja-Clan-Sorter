@@ -1323,13 +1323,18 @@ create policy "village_memberships_update_own" on public.village_memberships for
 drop policy if exists "village_memberships_delete_own" on public.village_memberships;
 create policy "village_memberships_delete_own" on public.village_memberships for delete using (auth.uid()=user_id);
 
+-- join_village changed return type during V11 development. PostgreSQL cannot
+-- CREATE OR REPLACE a function with a different return type, so explicitly
+-- drop the old signature before recreating the canonical row-returning RPC.
+drop function if exists public.join_village(uuid,text);
+
 create or replace function public.join_village(p_character_id uuid,p_village_id text)
-returns jsonb
+returns public.village_memberships
 language plpgsql
 security definer
 set search_path=public
 as $$
-declare v_user uuid:=auth.uid(); v_row public.village_memberships;
+declare v_user uuid:=auth.uid(); v_row public.village_memberships%rowtype;
 begin
   if v_user is null then raise exception 'authentication required'; end if;
   if p_village_id not in ('Konohagakure','Sunagakure','Kumogakure','Iwagakure','Kirigakure') then raise exception 'invalid village'; end if;
@@ -1338,7 +1343,7 @@ begin
   values(p_character_id,v_user,p_village_id,now(),now())
   on conflict(character_id) do update set village_id=excluded.village_id,user_id=excluded.user_id,joined_at=case when public.village_memberships.village_id=excluded.village_id then public.village_memberships.joined_at else now() end,updated_at=now()
   returning * into v_row;
-  return to_jsonb(v_row);
+  return v_row;
 end;
 $$;
 revoke all on function public.join_village(uuid,text) from public,anon;
@@ -2368,7 +2373,7 @@ begin
 
   select count(*) into v_member_count from public.shinobi_team_members where team_id=p_team_id;
   if v_member_count<2 then raise exception 'Cooperative operations require at least two squad members.'; end if;
-  if exists(select 1 from public.shinobi_team_operations where team_id=p_team_id and rank=p_rank and operation_day=current_date) then raise exception 'This squad has already completed its '||p_rank||'-Rank operation for today.'; end if;
+  if exists(select 1 from public.shinobi_team_operations where team_id=p_team_id and rank=p_rank and operation_day=current_date) then raise exception 'This squad has already completed its %-Rank operation for today.', p_rank; end if;
 
   select count(*),coalesce(avg(coalesce(p.level,1)),1),coalesce(avg(coalesce(p.completed_missions,0)),0),
          coalesce(sum((select coalesce(sum(value::int),0) from jsonb_each_text(coalesce(p.training_bonuses,'{}'::jsonb)))),0)
