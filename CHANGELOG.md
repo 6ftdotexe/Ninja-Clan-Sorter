@@ -1,5 +1,19 @@
 # Changelog
 
+## V11.5.0 — Interactive Gameplay Update
+
+- Replaced one-click mission resolution with a three-round interactive field challenge.
+- Added reusable Chakra Timing, Hand-Sign Memory, and Tactical Decision mini-games.
+- Mission success now weights player execution at 70% and character build/profile strength at 30%.
+- Added interactive stat training; failed drills spend no TP and elite scores can complete two training sessions.
+- Added interactive jutsu mastery drills before mastery resources are committed.
+- Added interactive Chūnin Exam stage gates before official server evaluation.
+- Added interactive World Event operations before participation resolves.
+- Added cooperative squad command challenges before team operations deploy.
+- Added Village War frontline command challenges before daily war deployments commit.
+- Added responsive modal gameplay UI and mobile controls.
+- Application/frontend/server release is 11.5.0; Supabase schema remains 11.4.0 because this update does not add database contracts.
+
 ## V11.4.0 — Bingo Book hotfix
 - Fixed the public Bingo Book layout colliding with the Chronicle dossier `.bingo-grid` styles.
 - Added defensive normalization for public Bingo Book RPC rows.

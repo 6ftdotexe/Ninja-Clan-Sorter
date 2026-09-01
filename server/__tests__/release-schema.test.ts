@@ -7,7 +7,7 @@ import { runPreflight } from '../preflight.js';
 describe('release contract', () => {
   it('keeps package.json aligned with the server release', async () => {
     await expect(verifyPackageVersion()).resolves.toBeUndefined();
-    expect(APP_VERSION).toBe('11.4.0');
+    expect(APP_VERSION).toBe('11.5.0');
   });
 
   it('ships the TypeScript runtime used by npm start as a production dependency', async () => {
@@ -16,7 +16,7 @@ describe('release contract', () => {
     expect(pkg.devDependencies?.tsx).toBeUndefined();
   });
 
-  it('expects the Phase 5 schema version', () => {
+  it('keeps the V11.4.0 gameplay schema for the interactive client release', () => {
     expect(EXPECTED_SCHEMA_VERSION).toBe('11.4.0');
   });
 

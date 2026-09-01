@@ -78,7 +78,7 @@ export function Layout(){
       </button>
       <div className="brand-actions">
         {mainNav.map(([path,label])=><button className="nav-chip" key={path} onClick={()=>navigate(path)}>{label}</button>)}
-        <span className="edition">V11 · PHASE 5</span>
+        <span className="edition">V11 · INTERACTIVE</span>
         {configured&&<button className="account-chip" onClick={()=>navigate(user?'/account':'/login')}>{user?'My Account':'Sign In'}</button>}
       </div>
     </header>

@@ -1,3 +1,8 @@
+
+## V11.5 Interactive Activity Layer
+
+`src/lib/minigames.tsx` is the shared activity runner for non-quiz gameplay. It exposes one three-round field session (timing, memory, tactics) with a normalized 0–100 execution score. Route modules decide how that score is applied: missions blend it into final success, while training/exam/world/co-op/war actions use it as an execution gate before committing the existing server-authoritative progression action. This keeps the mini-game UI reusable without adding per-feature game files.
+
 # Shinobi Identity Archive — Current Architecture
 
 This document describes the current application only. Historical architecture changes belong in `CHANGELOG.md`; setup and deployment instructions belong in `SETUP.md`.

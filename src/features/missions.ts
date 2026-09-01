@@ -19,10 +19,11 @@ export function generateMission(profile:NormalizedShinobiProfile,stats:CombatSta
   const traits=[...signature(profile),...strongest].filter(Boolean).slice(0,5),rewards=rankData[rank];
   return {id:crypto.randomUUID(),title:template[0],rank,category:template[1],objective:template[2],briefing:`${profile.village||'Your village'} intelligence has assigned ${profile.name} to the ${location}. The mission favors ${traits.slice(0,3).join(', ')||'balanced field skills'}. Adapt to changing conditions and prioritize the objective.`,location,recommended_traits:traits,rewards:{xp:rewards.xp,reputation:rewards.rep,trainingPoints:rewards.tp,ryo:rewards.ryo,badge:rank==='S'?'S-Rank Operative':rank==='A'?'A-Rank Veteran':null},status:'offered'};
 }
-export function resolveMission(mission:ShinobiMission,profile:NormalizedShinobiProfile,stats:CombatStats){
-  const relevant=Object.values(stats).sort((a,b)=>b-a).slice(0,4),average=relevant.reduce((a,b)=>a+b,0)/relevant.length,difficulty={D:42,C:50,B:60,A:70,S:80}[mission.rank];
-  const profileBonus=Math.min(9,[profile.specialty,profile.teamRole,profile.fightingStyle,profile.primaryChakra].filter(x=>x&&mission.recommended_traits.some(t=>t.toLowerCase().includes(x.toLowerCase()))).length*3),score=Math.round(average+profileBonus),success=score>=difficulty;
-  return {success,outcome:success?`${profile.name} completed ${mission.title} successfully. Their strongest attributes created a ${score-difficulty>=12?'decisive':'controlled'} advantage and the objective was secured.`:`${profile.name} was forced to withdraw from ${mission.title}. The objective exceeded the current operational margin, but the mission still produced useful field experience.`,score,difficulty};
+export function resolveMission(mission:ShinobiMission,profile:NormalizedShinobiProfile,stats:CombatStats,playerScore=50){
+  const relevant=Object.values(stats).sort((a,b)=>b-a).slice(0,4),average=relevant.reduce((a,b)=>a+b,0)/relevant.length,difficulty={D:48,C:54,B:61,A:68,S:75}[mission.rank];
+  const profileBonus=Math.min(9,[profile.specialty,profile.teamRole,profile.fightingStyle,profile.primaryChakra].filter(x=>x&&mission.recommended_traits.some(t=>t.toLowerCase().includes(x.toLowerCase()))).length*3);
+  const buildScore=Math.min(100,average+profileBonus),score=Math.round(playerScore*.7+buildScore*.3),success=score>=difficulty;
+  return {success,outcome:success?`${profile.name} completed ${mission.title} successfully with a field execution score of ${playerScore}. Their build and player execution combined for ${score} against difficulty ${difficulty}.`:`${profile.name} was forced to withdraw from ${mission.title}. Field execution scored ${playerScore}, producing a combined ${score} against difficulty ${difficulty}. The failed operation still produced useful field experience.`,score,difficulty};
 }
 
 export async function getProgression(userId:string,characterId:string){
