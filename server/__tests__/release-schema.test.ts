@@ -7,7 +7,7 @@ import { runPreflight } from '../preflight.js';
 describe('release contract', () => {
   it('keeps package.json aligned with the server release', async () => {
     await expect(verifyPackageVersion()).resolves.toBeUndefined();
-    expect(APP_VERSION).toBe('11.1.0');
+    expect(APP_VERSION).toBe('11.2.0');
   });
 
   it('ships the TypeScript runtime used by npm start as a production dependency', async () => {
@@ -16,8 +16,8 @@ describe('release contract', () => {
     expect(pkg.devDependencies?.tsx).toBeUndefined();
   });
 
-  it('expects the Phase 2 schema version', () => {
-    expect(EXPECTED_SCHEMA_VERSION).toBe('11.1.0');
+  it('expects the Phase 3 schema version', () => {
+    expect(EXPECTED_SCHEMA_VERSION).toBe('11.2.0');
   });
 
   it('reports a matching frontend/server/schema release contract', async () => {
@@ -67,6 +67,13 @@ describe('Supabase security/schema contracts', () => {
       'create or replace function public.purchase_shinobi_equipment(',
       'create or replace function public.equip_shinobi_equipment(',
       'grant update(slot) on public.jutsu_techniques to authenticated;',
+      'create table if not exists public.shinobi_competitive_seasons',
+      'create table if not exists public.chunin_exam_entries',
+      'create table if not exists public.shinobi_competitive_records',
+      'create or replace function public.register_chunin_exam(',
+      'create or replace function public.advance_chunin_exam(',
+      'create or replace function public.get_shinobi_competitive_record(',
+      'create or replace function public.list_competitive_leaderboard(',
     ];
     for (const contract of required) expect(sql.toLowerCase()).toContain(contract.toLowerCase());
   });

@@ -3,8 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export const APP_VERSION = '11.1.0';
-export const EXPECTED_SCHEMA_VERSION = '11.1.0';
+export const APP_VERSION = '11.2.0';
+export const EXPECTED_SCHEMA_VERSION = '11.2.0';
 export const RELEASE_CHANNEL = process.env.RELEASE_CHANNEL?.trim() || (process.env.NODE_ENV === 'production' ? 'production' : 'development');
 export const BUILD_COMMIT = (process.env.RENDER_GIT_COMMIT || process.env.BUILD_COMMIT || process.env.GIT_COMMIT || 'local').trim();
 export const BUILD_ID = (process.env.RENDER_SERVICE_ID || process.env.BUILD_ID || `${APP_VERSION}-${BUILD_COMMIT.slice(0, 12)}`).trim();

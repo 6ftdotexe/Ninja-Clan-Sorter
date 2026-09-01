@@ -25,12 +25,16 @@ const VillagesPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.Vil
 const VillagePage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.VillagePage})));
 const CareerPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.CareerPage})));
 const TrainingPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.TrainingPage})));
+const ExamsPage=lazy(()=>import('./pages/CompetitivePages').then(m=>({default:m.ExamsPage})));
+const SeasonsPage=lazy(()=>import('./pages/CompetitivePages').then(m=>({default:m.SeasonsPage})));
 
 const mainNav = [
   ['/discover','Discover'],
   ['/villages','Villages'],
   ['/career','Career'],
   ['/training','Training'],
+  ['/exams','Exams'],
+  ['/seasons','Seasons'],
   ['/arsenal','Arsenal'],
   ['/missions','Missions'],
   ['/teams','Teams'],
@@ -64,7 +68,7 @@ export function Layout(){
       </button>
       <div className="brand-actions">
         {mainNav.map(([path,label])=><button className="nav-chip" key={path} onClick={()=>navigate(path)}>{label}</button>)}
-        <span className="edition">V11 · PHASE 2</span>
+        <span className="edition">V11 · PHASE 3</span>
         {configured&&<button className="account-chip" onClick={()=>navigate(user?'/account':'/login')}>{user?'My Account':'Sign In'}</button>}
       </div>
     </header>
@@ -89,6 +93,8 @@ export default function App(){
     <Route path="/villages/:villageId" element={<VillagePage/>}/>
     <Route path="/career" element={<CareerPage/>}/>
     <Route path="/training" element={<TrainingPage/>}/>
+    <Route path="/exams" element={<ExamsPage/>}/>
+    <Route path="/seasons" element={<SeasonsPage/>}/>
     <Route path="/arsenal" element={<ArsenalPage/>}/>
     <Route path="/missions" element={<MissionsPage/>}/>
     <Route path="/teams" element={<TeamsPage/>}/>

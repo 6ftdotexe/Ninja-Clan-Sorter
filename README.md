@@ -2,13 +2,13 @@
 
 V11 is the current major release of the Shinobi Identity Archive. Phase 2 turns the Living Shinobi World into a build-progression RPG layer: missions now fund training points and ryō, characters can permanently specialize stats, saved jutsu gain mastery levels, and equipment can be purchased and equipped per shinobi.
 
-## V11 Phase 2 — Training + Jutsu Mastery + Equipment
+## V11 Phase 3 — Training + Jutsu Mastery + Equipment
 
-V11.1.0 builds directly on Phase 1 Living Villages and Career Records. Mission success now awards training points and ryō in addition to XP and village reputation. Training points improve permanent character stat bonuses or jutsu mastery, while ryō purchases field equipment with loadout bonuses.
+V11.2.0 builds directly on Phase 1 Living Villages and Career Records. Mission success now awards training points and ryō in addition to XP and village reputation. Training points improve permanent character stat bonuses or jutsu mastery, while ryō purchases field equipment with loadout bonuses.
 
 The new `/training` route manages stat specialization and resources. `/arsenal` now includes jutsu mastery and an equipment inventory/catalog. Existing V10/V11 identity, village, mission, social, public-profile, generation, and chronicle systems remain intact.
 
-This release requires the V11.1.0 Supabase schema before deployment. Run `npm run release:check`, apply `supabase/schema.sql` first, deploy the application, then verify `/api/health/ready` and `/api/version`.
+This release requires the V11.2.0 Supabase schema before deployment. Run `npm run release:check`, apply `supabase/schema.sql` first, deploy the application, then verify `/api/health/ready` and `/api/version`.
 
 ## Documentation
 
@@ -120,3 +120,8 @@ The response reports the actual bundled frontend manifest, server version, datab
 
 For production rollouts, apply the current `supabase/schema.sql` first, deploy the application second, and configure Render health checks to use `/api/health/ready`.
 
+
+
+## V11 Phase 3
+
+Phase 3 adds Chūnin Exam registration, four server-authoritative exam stages, persistent competitive records, seasonal points, public leaderboards, qualification titles, and tournament rewards. New routes: `/exams` and `/seasons`.

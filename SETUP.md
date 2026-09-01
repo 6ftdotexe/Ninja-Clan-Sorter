@@ -46,7 +46,7 @@ npm run check
 
 
 
-## V11.1.0 Phase 2 schema upgrade
+## V11.2.0 Phase 2 schema upgrade
 
 Phase 2 adds Training Points, ryō, permanent stat-training bonuses, jutsu mastery columns, equipment inventory, and authoritative progression RPCs. Re-run the current:
 
@@ -54,9 +54,9 @@ Phase 2 adds Training Points, ryō, permanent stat-training bonuses, jutsu maste
 supabase/schema.sql
 ```
 
-Apply the schema **before** deploying V11.1.0. Production startup expects schema version `11.1.0`. Existing characters, missions, village memberships, jutsu, payments, and public profiles are preserved.
+Apply the schema **before** deploying V11.2.0. Production startup expects schema version `11.2.0`. Existing characters, missions, village memberships, jutsu, payments, and public profiles are preserved.
 
-After deployment, verify `/api/version` reports application/frontend/server/schema version `11.1.0`.
+After deployment, verify `/api/version` reports application/frontend/server/schema version `11.2.0`.
 
 ## V11.0.0 schema upgrade
 
@@ -419,19 +419,19 @@ Then verify in production:
 
 The current release intentionally keeps one evolving database file at `supabase/schema.sql`, one setup guide (`SETUP.md`), and one release history (`CHANGELOG.md`). New releases should update these files instead of adding phase-specific equivalents.
 
-## Current production release — V11.1.0
+## Current production release — V11.2.0
 
-V10.5.x remains the stable historical baseline. V11.1.0 is the current feature release and requires the Phase 2 schema because training resources, jutsu mastery, and equipment add persistent progression data and RPCs.
+V10.5.x remains the stable historical baseline. V11.2.0 is the current feature release and requires the Phase 2 schema because training resources, jutsu mastery, and equipment add persistent progression data and RPCs.
 
 ### Required upgrade order
 
 1. Back up the current Supabase project/database.
 2. Run the current `supabase/schema.sql`.
-3. Confirm the live schema preflight reports `11.1.0`.
+3. Confirm the live schema preflight reports `11.2.0`.
 4. Run `npm install` and `npm run release:check`.
-5. Deploy the V11.1.0 application/server.
+5. Deploy the V11.2.0 application/server.
 6. Point the platform health check at `/api/health/ready`.
-7. Verify `/api/version` reports application/server/frontend/schema version `11.1.0`.
+7. Verify `/api/version` reports application/server/frontend/schema version `11.2.0`.
 8. Sign in, select a saved shinobi, join a village, and confirm `/career` reflects the membership.
 9. Complete a mission and confirm village reputation/mission totals update on the career and village pages.
 10. Publish a test shinobi and confirm its public profile shows the safe public career summary.
@@ -470,12 +470,17 @@ GET /api/version
 Expected release contract:
 
 ```text
-Application: 11.1.0
-Server:      11.1.0
-Frontend:    11.1.0
-Schema:      11.1.0
+Application: 11.2.0
+Server:      11.2.0
+Frontend:    11.2.0
+Schema:      11.2.0
 ```
 
 ### Diagnostics
 
 If `DIAGNOSTICS_TOKEN` is configured, the protected internal snapshot remains available at `GET /api/internal/diagnostics` with `X-Diagnostics-Token`. Structured logs continue to omit secrets, request bodies, prompt contents, images, emails, and user IDs.
+
+
+## V11.2.0 Phase 3 upgrade
+
+Re-run `supabase/schema.sql` before deploying the V11.2.0 application. The schema adds competitive seasons, Chūnin Exam entries, competitive records, exam RPCs, and the public seasonal leaderboard.

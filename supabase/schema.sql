@@ -1759,7 +1759,240 @@ revoke all on function public.complete_shinobi_mission_v10(uuid,text,boolean) fr
 grant execute on function public.complete_shinobi_mission_v10(uuid,text,boolean) to authenticated;
 
 -- ============================================================================
--- Release metadata — V11.1.0+
+-- V11 Phase 3 — Chūnin Exams & Competitive Seasons
+-- ============================================================================
+create table if not exists public.shinobi_competitive_seasons (
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null,
+  name text not null,
+  theme text not null default '',
+  status text not null default 'upcoming' check (status in ('upcoming','active','completed')),
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+alter table public.shinobi_competitive_seasons enable row level security;
+drop policy if exists "competitive seasons are public" on public.shinobi_competitive_seasons;
+create policy "competitive seasons are public" on public.shinobi_competitive_seasons for select using (true);
+
+insert into public.shinobi_competitive_seasons(slug,name,theme,status,starts_at,ends_at)
+select 'rising-storm-1','Season 1 — Rising Storm','Prove your readiness through the Chūnin Exams and establish an early place in the Shinobi World.','active',now()-interval '1 day',now()+interval '90 days'
+where not exists(select 1 from public.shinobi_competitive_seasons where status='active');
+
+create table if not exists public.chunin_exam_entries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  character_id uuid not null references public.shinobi_characters(id) on delete cascade,
+  season_id uuid not null references public.shinobi_competitive_seasons(id) on delete cascade,
+  stage text not null default 'tactical' check (stage in ('tactical','survival','preliminaries','finals','complete')),
+  status text not null default 'registered' check (status in ('registered','active','eliminated','completed')),
+  tactical_score integer check (tactical_score between 0 and 100),
+  survival_score integer check (survival_score between 0 and 100),
+  preliminary_score integer check (preliminary_score between 0 and 100),
+  final_score integer check (final_score between 0 and 100),
+  total_score integer not null default 0 check (total_score >= 0),
+  qualification text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(character_id,season_id)
+);
+create index if not exists chunin_exam_entries_season_score_idx on public.chunin_exam_entries(season_id,total_score desc,updated_at asc);
+create index if not exists chunin_exam_entries_user_idx on public.chunin_exam_entries(user_id,created_at desc);
+alter table public.chunin_exam_entries enable row level security;
+drop policy if exists "Users view own exam entries" on public.chunin_exam_entries;
+create policy "Users view own exam entries" on public.chunin_exam_entries for select using (auth.uid()=user_id);
+revoke insert,update,delete on public.chunin_exam_entries from anon,authenticated;
+
+create table if not exists public.shinobi_competitive_records (
+  character_id uuid not null references public.shinobi_characters(id) on delete cascade,
+  season_id uuid not null references public.shinobi_competitive_seasons(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  season_points integer not null default 0 check (season_points >= 0),
+  exams_entered integer not null default 0 check (exams_entered >= 0),
+  exams_completed integer not null default 0 check (exams_completed >= 0),
+  exam_wins integer not null default 0 check (exam_wins >= 0),
+  best_finish text not null default 'Unranked',
+  updated_at timestamptz not null default now(),
+  primary key(character_id,season_id)
+);
+create index if not exists shinobi_competitive_records_points_idx on public.shinobi_competitive_records(season_points desc,exam_wins desc,updated_at asc);
+alter table public.shinobi_competitive_records enable row level security;
+drop policy if exists "Users view own competitive record" on public.shinobi_competitive_records;
+create policy "Users view own competitive record" on public.shinobi_competitive_records for select using (auth.uid()=user_id);
+revoke insert,update,delete on public.shinobi_competitive_records from anon,authenticated;
+
+create or replace function public._exam_stage_score(p_character_id uuid,p_stage text,p_season_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path=public
+stable
+as $$
+declare
+  p public.shinobi_progression%rowtype;
+  training_total integer:=0;
+  mastered integer:=0;
+  mission_depth integer:=0;
+  variance integer:=0;
+  score integer:=0;
+begin
+  select * into p from public.shinobi_progression where character_id=p_character_id;
+  if not found then return 0; end if;
+  select coalesce(sum(value::integer),0) into training_total from jsonb_each_text(coalesce(p.training_bonuses,'{}'::jsonb));
+  select count(*)::integer into mastered from public.jutsu_techniques where character_id=p_character_id and mastery_level>=3;
+  mission_depth:=coalesce(p.d_missions,0)+coalesce(p.c_missions,0)*2+coalesce(p.b_missions,0)*3+coalesce(p.a_missions,0)*4+coalesce(p.s_missions,0)*5;
+  variance:=abs(hashtext(p_character_id::text||':'||p_stage||':'||p_season_id::text))%17;
+  score:=least(100,
+    18 + least(28,p.level*2) + least(18,p.village_reputation/30) + least(16,mission_depth) + least(12,training_total/2) + least(8,mastered*2) + variance
+  );
+  if p_stage='tactical' then score:=least(100,score + least(7,coalesce((p.training_bonuses->>'intelligence')::integer,0)+coalesce((p.training_bonuses->>'leadership')::integer,0))/2); end if;
+  if p_stage='survival' then score:=least(100,score + least(7,coalesce((p.training_bonuses->>'stamina')::integer,0)+coalesce((p.training_bonuses->>'adaptability')::integer,0))/2); end if;
+  if p_stage='preliminaries' then score:=least(100,score + least(7,coalesce((p.training_bonuses->>'speed')::integer,0)+coalesce((p.training_bonuses->>'taijutsu')::integer,0))/2); end if;
+  if p_stage='finals' then score:=least(100,score + least(7,coalesce((p.training_bonuses->>'ninjutsu')::integer,0)+coalesce((p.training_bonuses->>'chakraControl')::integer,0))/2); end if;
+  return greatest(0,score);
+end;
+$$;
+revoke all on function public._exam_stage_score(uuid,text,uuid) from public,anon,authenticated;
+
+create or replace function public.register_chunin_exam(p_character_id uuid)
+returns public.chunin_exam_entries
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  v_user uuid:=auth.uid();
+  v_season public.shinobi_competitive_seasons%rowtype;
+  v_progress public.shinobi_progression%rowtype;
+  v_entry public.chunin_exam_entries%rowtype;
+  v_existing boolean:=false;
+begin
+  if v_user is null then raise exception 'Authentication required.'; end if;
+  if not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=v_user) then raise exception 'Character not found.'; end if;
+  select * into v_season from public.shinobi_competitive_seasons where status='active' and starts_at<=now() and ends_at>now() order by starts_at desc limit 1;
+  if not found then raise exception 'No active competitive season.'; end if;
+  select * into v_progress from public.shinobi_progression where character_id=p_character_id and user_id=v_user;
+  if not found or v_progress.level<5 or v_progress.completed_missions<3 then raise exception 'Chūnin Exam registration requires level 5 and at least 3 completed missions.'; end if;
+  select exists(select 1 from public.chunin_exam_entries where character_id=p_character_id and season_id=v_season.id) into v_existing;
+  insert into public.chunin_exam_entries(user_id,character_id,season_id,stage,status)
+  values(v_user,p_character_id,v_season.id,'tactical','registered')
+  on conflict(character_id,season_id) do update set updated_at=now()
+  returning * into v_entry;
+  insert into public.shinobi_competitive_records(character_id,season_id,user_id,exams_entered,updated_at)
+  values(p_character_id,v_season.id,v_user,1,now())
+  on conflict(character_id,season_id) do update set exams_entered=public.shinobi_competitive_records.exams_entered+case when v_existing then 0 else 1 end,updated_at=now();
+  return v_entry;
+end;
+$$;
+revoke all on function public.register_chunin_exam(uuid) from public,anon;
+grant execute on function public.register_chunin_exam(uuid) to authenticated;
+
+create or replace function public.advance_chunin_exam(p_entry_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  e public.chunin_exam_entries%rowtype;
+  stage_score integer;
+  threshold integer;
+  passed boolean;
+  points integer:=0;
+  next_stage text;
+  v_qualification text:=null;
+  message text;
+begin
+  select * into e from public.chunin_exam_entries where id=p_entry_id and user_id=auth.uid() for update;
+  if not found then raise exception 'Exam entry not found.'; end if;
+  if e.status in ('eliminated','completed') then raise exception 'This exam run has already ended.'; end if;
+  stage_score:=public._exam_stage_score(e.character_id,e.stage,e.season_id);
+  threshold:=case e.stage when 'tactical' then 58 when 'survival' then 62 when 'preliminaries' then 66 when 'finals' then 70 else 101 end;
+  passed:=stage_score>=threshold;
+  points:=case e.stage when 'tactical' then case when passed then 25 else 8 end when 'survival' then case when passed then 40 else 12 end when 'preliminaries' then case when passed then 60 else 18 end when 'finals' then case when passed then 100 else 30 end else 0 end;
+  next_stage:=case e.stage when 'tactical' then 'survival' when 'survival' then 'preliminaries' when 'preliminaries' then 'finals' else 'complete' end;
+  if e.stage='finals' then
+    v_qualification:=case when stage_score>=88 then 'Chūnin Exam Champion' when passed then 'Chūnin Certified' else 'Finalist' end;
+  elsif not passed then v_qualification:=case e.stage when 'tactical' then 'Tactical Stage' when 'survival' then 'Survival Stage' else 'Preliminary Finalist' end;
+  end if;
+  update public.chunin_exam_entries set
+    status=case when e.stage='finals' then 'completed' when passed then 'active' else 'eliminated' end,
+    stage=case when e.stage='finals' or not passed then 'complete' else next_stage end,
+    tactical_score=case when e.stage='tactical' then stage_score else tactical_score end,
+    survival_score=case when e.stage='survival' then stage_score else survival_score end,
+    preliminary_score=case when e.stage='preliminaries' then stage_score else preliminary_score end,
+    final_score=case when e.stage='finals' then stage_score else final_score end,
+    total_score=total_score+stage_score,
+    qualification=coalesce(v_qualification,public.chunin_exam_entries.qualification),
+    updated_at=now()
+  where id=e.id returning * into e;
+  insert into public.shinobi_competitive_records(character_id,season_id,user_id,season_points,exams_entered,updated_at)
+  values(e.character_id,e.season_id,e.user_id,points,1,now())
+  on conflict(character_id,season_id) do update set
+    season_points=public.shinobi_competitive_records.season_points+points,
+    exams_completed=public.shinobi_competitive_records.exams_completed+case when e.status in ('completed','eliminated') then 1 else 0 end,
+    exam_wins=public.shinobi_competitive_records.exam_wins+case when e.qualification='Chūnin Exam Champion' then 1 else 0 end,
+    best_finish=case
+      when e.qualification='Chūnin Exam Champion' then 'Chūnin Exam Champion'
+      when e.qualification='Chūnin Certified' and public.shinobi_competitive_records.best_finish<>'Chūnin Exam Champion' then 'Chūnin Certified'
+      when e.qualification='Finalist' and public.shinobi_competitive_records.best_finish in ('Unranked','Tactical Stage','Survival Stage','Preliminary Finalist') then 'Finalist'
+      when e.qualification is not null and public.shinobi_competitive_records.best_finish='Unranked' then e.qualification
+      else public.shinobi_competitive_records.best_finish end,
+    updated_at=now();
+  if e.qualification='Chūnin Exam Champion' then
+    update public.shinobi_progression set current_title='Chūnin Exam Champion',training_points=training_points+5,ryo=ryo+500,updated_at=now() where character_id=e.character_id and user_id=e.user_id;
+  elsif e.qualification='Chūnin Certified' then
+    update public.shinobi_progression set current_title='Chūnin Certified',training_points=training_points+3,ryo=ryo+300,updated_at=now() where character_id=e.character_id and user_id=e.user_id;
+  end if;
+  message:=case when passed then 'Stage passed.' else 'Stage score fell below the promotion threshold.' end;
+  return jsonb_build_object('entry',to_jsonb(e),'score',stage_score,'passed',passed,'message',message,'season_points_awarded',points);
+end;
+$$;
+revoke all on function public.advance_chunin_exam(uuid) from public,anon;
+grant execute on function public.advance_chunin_exam(uuid) to authenticated;
+
+create or replace function public.get_shinobi_competitive_record(p_character_id uuid)
+returns public.shinobi_competitive_records
+language plpgsql
+security definer
+set search_path=public
+stable
+as $$
+declare v_row public.shinobi_competitive_records%rowtype;
+begin
+  if auth.uid() is null or not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=auth.uid()) then return null; end if;
+  select r.* into v_row from public.shinobi_competitive_records r join public.shinobi_competitive_seasons s on s.id=r.season_id where r.character_id=p_character_id and r.user_id=auth.uid() and s.status='active' order by s.starts_at desc limit 1;
+  return v_row;
+end;
+$$;
+revoke all on function public.get_shinobi_competitive_record(uuid) from public,anon;
+grant execute on function public.get_shinobi_competitive_record(uuid) to authenticated;
+
+create or replace function public.list_competitive_leaderboard(p_limit integer default 25)
+returns jsonb
+language sql
+security definer
+set search_path=public
+stable
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'character_id',r.character_id,'name',coalesce(c.shinobi_alias,c.name),'public_slug',c.public_slug,'portrait_url',c.portrait_url,
+    'village',coalesce(vm.village_id,c.village),'season_points',r.season_points,'exams_completed',r.exams_completed,'exam_wins',r.exam_wins,'best_finish',r.best_finish
+  ) order by r.season_points desc,r.exam_wins desc,r.updated_at asc),'[]'::jsonb)
+  from (
+    select r.* from public.shinobi_competitive_records r
+    join public.shinobi_competitive_seasons s on s.id=r.season_id and s.status='active'
+    join public.shinobi_characters pc on pc.id=r.character_id and pc.is_public=true
+    order by r.season_points desc,r.exam_wins desc,r.updated_at asc limit least(50,greatest(1,p_limit))
+  ) r
+  join public.shinobi_characters c on c.id=r.character_id
+  left join public.village_memberships vm on vm.character_id=c.id;
+$$;
+revoke all on function public.list_competitive_leaderboard(integer) from public;
+grant execute on function public.list_competitive_leaderboard(integer) to anon,authenticated;
+
+-- ============================================================================
+-- Release metadata — V11.2.0+
 -- The application uses this to verify that the deployed server and database
 -- schema were rolled out together before reporting readiness.
 -- ============================================================================
@@ -1772,7 +2005,7 @@ alter table public.app_release_metadata enable row level security;
 revoke all on public.app_release_metadata from public,anon,authenticated;
 
 insert into public.app_release_metadata(key,value,updated_at)
-values('schema_version','11.1.0',now())
+values('schema_version','11.2.0',now())
 on conflict(key) do update set value=excluded.value,updated_at=excluded.updated_at;
 
 create or replace function public.get_app_schema_version()

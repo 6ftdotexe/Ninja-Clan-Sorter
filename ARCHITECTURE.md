@@ -4,7 +4,7 @@ This document describes the current application only. Historical architecture ch
 
 
 
-## V11.1.0 — Phase 2 progression layer
+## V11.2.0 — Phase 2 progression layer
 
 Phase 2 adds a server-authoritative build progression loop without splitting the project into many new modules. `src/features/training.ts` owns training resources, stat specialization, jutsu mastery, and equipment catalog/inventory operations. `WorldPages.tsx` adds the Training Grounds route while `SystemPages.tsx` extends Arsenal with mastery and gear.
 
@@ -233,3 +233,8 @@ The consolidated V10.5.0 release aligns the application, server, frontend build 
 ## Stable-candidate hardening
 
 V10.5.0 adds HashRouter-safe Stripe returns, production HSTS/API no-store behavior, explicit Node HTTP timeouts, fatal-process shutdown handling, and a React route error boundary for stale lazy chunks. The production `npm start` path intentionally uses `tsx`, so `tsx` is a runtime dependency.
+
+
+## V11 Phase 3 competitive layer
+
+`src/features/competitive.ts` owns season/exam data access and `src/pages/CompetitivePages.tsx` owns the Chūnin Exams and seasonal leaderboard UI. Supabase remains authoritative for registration, stage scoring, rewards, and competitive records.

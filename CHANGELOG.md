@@ -1,5 +1,16 @@
 # Changelog
 
+## V11.2.0 — Phase 3: Chūnin Exams & Competitive Seasons
+
+- Added four-stage Chūnin Exams: Tactical, Survival, Preliminaries, and Finals.
+- Added server-authoritative registration requirements and stage scoring.
+- Added persistent competitive records, season points, exam wins, and best finishes.
+- Added public seasonal leaderboard and current-season surface.
+- Connected career level, mission depth, training bonuses, and jutsu mastery to exam performance.
+- Added Chūnin Certified and Chūnin Exam Champion outcomes with TP/ryō rewards.
+- Added `/exams` and `/seasons` routes and Phase 3 navigation.
+- Bumped application and schema to 11.2.0.
+
 ## V11.1.0 — Phase 2: Training, Jutsu Mastery & Equipment
 
 - Added mission-earned Training Points and ryō as persistent per-character progression resources.

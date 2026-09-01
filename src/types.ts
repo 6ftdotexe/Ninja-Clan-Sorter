@@ -64,3 +64,11 @@ export interface VillageDirectoryEntry{village_id:VillageId;member_count:number;
 export interface VillagePublicMember{character:ShinobiCharacter;level:number;reputation:number;completed_missions:number;title:string}
 export interface VillageProfile{summary:VillageDirectoryEntry;members:VillagePublicMember[]}
 export interface CareerRecord{character_id:string;village_id:VillageId|null;joined_at:string|null;xp:number;level:number;village_reputation:number;completed_missions:number;d_missions:number;c_missions:number;b_missions:number;a_missions:number;s_missions:number;current_title:string;mission_successes:number;mission_failures:number;mission_abandoned:number;success_rate:number;operational_rank:string;next_milestone:string}
+
+export type ExamStage='tactical'|'survival'|'preliminaries'|'finals'|'complete';
+export type ExamEntryStatus='registered'|'active'|'eliminated'|'completed';
+export interface CompetitiveSeason{id:string;slug:string;name:string;theme:string;status:'upcoming'|'active'|'completed';starts_at:string;ends_at:string;created_at:string}
+export interface ChuninExamEntry{id:string;user_id:string;character_id:string;season_id:string;stage:ExamStage;status:ExamEntryStatus;tactical_score:number|null;survival_score:number|null;preliminary_score:number|null;final_score:number|null;total_score:number;qualification:string|null;created_at:string;updated_at:string;season?:CompetitiveSeason}
+export interface CompetitiveRecord{character_id:string;season_id:string;user_id:string;season_points:number;exams_entered:number;exams_completed:number;exam_wins:number;best_finish:string;updated_at:string}
+export interface CompetitiveLeaderboardEntry{character_id:string;name:string;public_slug:string|null;portrait_url:string|null;village:string|null;season_points:number;exams_completed:number;exam_wins:number;best_finish:string}
+export interface ExamAdvanceResult{entry:ChuninExamEntry;score:number;passed:boolean;message:string;season_points_awarded:number}
