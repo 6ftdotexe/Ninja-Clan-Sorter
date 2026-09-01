@@ -1,5 +1,20 @@
 # Changelog
 
+## V11.3.0 — Phase 4: Dynamic World Events & Rogue Shinobi
+
+- Added persistent active world events and event participation.
+- Added `/world` with limited-time operations, difficulty, participation totals, and contribution tracking.
+- Connected level, completed missions, training bonuses, allegiance, and event difficulty to server-authoritative event resolution.
+- Added world-event Training Point, ryō, and reputation rewards.
+- Added the missing-nin career path with `/rogue`.
+- Added level/mission eligibility checks before defection.
+- Added persistent notoriety, bounty, threat class, rogue title, last-known village, and rogue-since tracking.
+- Rogue world-event participation converts reputation rewards into notoriety and bounty growth.
+- Added public `/bingo-book` rankings for published rogue shinobi without exposing account-owner data.
+- Rejoining a village automatically clears active rogue status so allegiance remains singular.
+- Added Phase 4 database indexes, RPC security boundaries, regression schema contracts, navigation, responsive UI, and documentation.
+- Bumped application, frontend, server, and Supabase schema to 11.3.0.
+
 ## V11.2.0 — Phase 3: Chūnin Exams & Competitive Seasons
 
 - Added four-stage Chūnin Exams: Tactical, Survival, Preliminaries, and Finals.

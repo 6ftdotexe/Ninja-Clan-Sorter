@@ -25,6 +25,9 @@ const VillagesPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.Vil
 const VillagePage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.VillagePage})));
 const CareerPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.CareerPage})));
 const TrainingPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.TrainingPage})));
+const WorldEventsPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.WorldEventsPage})));
+const RoguePathPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.RoguePathPage})));
+const BingoBookPage=lazy(()=>import('./pages/WorldPages').then(m=>({default:m.BingoBookPage})));
 const ExamsPage=lazy(()=>import('./pages/CompetitivePages').then(m=>({default:m.ExamsPage})));
 const SeasonsPage=lazy(()=>import('./pages/CompetitivePages').then(m=>({default:m.SeasonsPage})));
 
@@ -33,6 +36,9 @@ const mainNav = [
   ['/villages','Villages'],
   ['/career','Career'],
   ['/training','Training'],
+  ['/world','World'],
+  ['/rogue','Rogue'],
+  ['/bingo-book','Bingo Book'],
   ['/exams','Exams'],
   ['/seasons','Seasons'],
   ['/arsenal','Arsenal'],
@@ -68,12 +74,12 @@ export function Layout(){
       </button>
       <div className="brand-actions">
         {mainNav.map(([path,label])=><button className="nav-chip" key={path} onClick={()=>navigate(path)}>{label}</button>)}
-        <span className="edition">V11 · PHASE 3</span>
+        <span className="edition">V11 · PHASE 4</span>
         {configured&&<button className="account-chip" onClick={()=>navigate(user?'/account':'/login')}>{user?'My Account':'Sign In'}</button>}
       </div>
     </header>
     <section className="card route-stage"><RouteErrorBoundary><Suspense fallback={<RouteFallback/>}><Outlet/></Suspense></RouteErrorBoundary></section>
-    <footer>Unofficial fan-made personality experience. React + TypeScript · V{__APP_VERSION__} · Identity, living villages, training, jutsu mastery, equipment, career progression, missions, social systems, and chronicle.</footer>
+    <footer>Unofficial fan-made personality experience. React + TypeScript · V{__APP_VERSION__} · Identity, living villages, dynamic world events, rogue shinobi, training, jutsu mastery, equipment, competitive seasons, missions, social systems, and chronicle.</footer>
   </main>;
 }
 
@@ -93,6 +99,9 @@ export default function App(){
     <Route path="/villages/:villageId" element={<VillagePage/>}/>
     <Route path="/career" element={<CareerPage/>}/>
     <Route path="/training" element={<TrainingPage/>}/>
+    <Route path="/world" element={<WorldEventsPage/>}/>
+    <Route path="/rogue" element={<RoguePathPage/>}/>
+    <Route path="/bingo-book" element={<BingoBookPage/>}/>
     <Route path="/exams" element={<ExamsPage/>}/>
     <Route path="/seasons" element={<SeasonsPage/>}/>
     <Route path="/arsenal" element={<ArsenalPage/>}/>

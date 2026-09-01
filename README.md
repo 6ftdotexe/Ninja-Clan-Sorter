@@ -2,13 +2,13 @@
 
 V11 is the current major release of the Shinobi Identity Archive. Phase 2 turns the Living Shinobi World into a build-progression RPG layer: missions now fund training points and ryō, characters can permanently specialize stats, saved jutsu gain mastery levels, and equipment can be purchased and equipped per shinobi.
 
-## V11 Phase 3 — Training + Jutsu Mastery + Equipment
+## V11 Phase 4 — Dynamic World Events + Rogue Shinobi
 
-V11.2.0 builds directly on Phase 1 Living Villages and Career Records. Mission success now awards training points and ryō in addition to XP and village reputation. Training points improve permanent character stat bonuses or jutsu mastery, while ryō purchases field equipment with loadout bonuses.
+V11.3.0 expands the Living Shinobi World with active world incidents, one-run-per-character event participation, rogue-shinobi careers, notoriety, bounties, evolving threat classes, and a privacy-safe public Bingo Book. Existing villages, careers, training, equipment, missions, and competitive seasons now feed into the same world-state loop.
 
 The new `/training` route manages stat specialization and resources. `/arsenal` now includes jutsu mastery and an equipment inventory/catalog. Existing V10/V11 identity, village, mission, social, public-profile, generation, and chronicle systems remain intact.
 
-This release requires the V11.2.0 Supabase schema before deployment. Run `npm run release:check`, apply `supabase/schema.sql` first, deploy the application, then verify `/api/health/ready` and `/api/version`.
+This release requires the V11.3.0 Supabase schema before deployment. Run `npm run release:check`, apply `supabase/schema.sql` first, deploy the application, then verify `/api/health/ready` and `/api/version`.
 
 ## Documentation
 
@@ -125,3 +125,8 @@ For production rollouts, apply the current `supabase/schema.sql` first, deploy t
 ## V11 Phase 3
 
 Phase 3 adds Chūnin Exam registration, four server-authoritative exam stages, persistent competitive records, seasonal points, public leaderboards, qualification titles, and tournament rewards. New routes: `/exams` and `/seasons`.
+
+
+## V11 Phase 4
+
+Phase 4 adds `/world`, `/rogue`, and `/bingo-book`. Active world events are public, but participation is authenticated and server-authoritative. Village and independent shinobi earn field rewards and reputation; missing-nin convert the same world pressure into notoriety and bounty growth. Rejoining a village clears active rogue status so allegiance remains singular.

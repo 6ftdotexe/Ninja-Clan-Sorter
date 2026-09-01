@@ -1,5 +1,5 @@
 import {cleanText,requireSupabase,supabase,unwrapMaybe} from '../lib/supabase';
-import type {CareerRecord,ShinobiCharacter,VillageDirectoryEntry,VillageId,VillageProfile} from '../types';
+import type {BingoBookEntry,CareerRecord,RogueProfile,ShinobiCharacter,VillageDirectoryEntry,VillageId,VillageProfile,WorldEvent,WorldEventParticipation,WorldEventResult} from '../types';
 
 export const VILLAGES:Record<VillageId,{label:string;symbol:string;tagline:string;terrain:string}>={
   Konohagakure:{label:'Konohagakure',symbol:'葉',tagline:'Bonds, growth, and versatile teamwork.',terrain:'Forest stronghold'},
@@ -54,4 +54,41 @@ export async function getCareerRecord(characterId:string):Promise<CareerRecord|n
 export async function getPublicCareerRecord(slug:string):Promise<CareerRecord|null>{
   if(!supabase)return null;
   return unwrapMaybe<CareerRecord>(await supabase.rpc('get_public_shinobi_career',{p_slug:cleanText(slug,80)}));
+}
+
+// V11 Phase 4 — dynamic world events and rogue-shinobi career path.
+
+export async function listActiveWorldEvents():Promise<WorldEvent[]>{
+  if(!supabase)return[];
+  const rows=unwrapMaybe<WorldEvent[]>(await supabase.rpc('list_active_world_events'));
+  return Array.isArray(rows)?rows:[];
+}
+
+export async function listMyWorldEventParticipation(characterId:string):Promise<WorldEventParticipation[]>{
+  if(!supabase||!characterId)return[];
+  const rows=unwrapMaybe<WorldEventParticipation[]>(await supabase.rpc('list_my_world_event_participation',{p_character_id:characterId}));
+  return Array.isArray(rows)?rows:[];
+}
+
+export async function participateWorldEvent(eventId:string,characterId:string):Promise<WorldEventResult>{
+  return unwrapMaybe<WorldEventResult>(await requireSupabase().rpc('participate_world_event',{p_event_id:eventId,p_character_id:characterId})) as WorldEventResult;
+}
+
+export async function getRogueProfile(characterId:string):Promise<RogueProfile|null>{
+  if(!supabase||!characterId)return null;
+  return unwrapMaybe<RogueProfile>(await supabase.rpc('get_shinobi_rogue_profile',{p_character_id:characterId}));
+}
+
+export async function becomeRogue(characterId:string):Promise<RogueProfile>{
+  return unwrapMaybe<RogueProfile>(await requireSupabase().rpc('become_rogue',{p_character_id:characterId})) as RogueProfile;
+}
+
+export async function renounceRogueStatus(characterId:string){
+  return unwrapMaybe<boolean>(await requireSupabase().rpc('renounce_rogue_status',{p_character_id:characterId}));
+}
+
+export async function listPublicBingoBook(limit=30):Promise<BingoBookEntry[]>{
+  if(!supabase)return[];
+  const rows=unwrapMaybe<BingoBookEntry[]>(await supabase.rpc('list_public_bingo_book',{p_limit:Math.min(50,Math.max(1,limit))}));
+  return Array.isArray(rows)?rows:[];
 }

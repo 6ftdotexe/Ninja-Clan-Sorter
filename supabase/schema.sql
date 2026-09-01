@@ -2019,3 +2019,281 @@ as $$
 $$;
 revoke all on function public.get_app_schema_version() from public,anon,authenticated;
 grant execute on function public.get_app_schema_version() to service_role;
+
+-- ============================================================================
+-- V11 Phase 4 — Dynamic World Events & Rogue Shinobi
+-- ============================================================================
+create table if not exists public.shinobi_world_events (
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null,
+  title text not null,
+  event_type text not null check (event_type in ('invasion','rogue_hunt','disaster','scroll_theft','border_conflict','summoning_outbreak')),
+  description text not null default '',
+  target_village text null check (target_village is null or target_village in ('Konohagakure','Sunagakure','Kumogakure','Iwagakure','Kirigakure')),
+  difficulty text not null default 'B' check (difficulty in ('D','C','B','A','S')),
+  status text not null default 'active' check (status in ('upcoming','active','resolved')),
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+alter table public.shinobi_world_events enable row level security;
+drop policy if exists "world events are public" on public.shinobi_world_events;
+create policy "world events are public" on public.shinobi_world_events for select using (true);
+
+create table if not exists public.shinobi_world_event_participation (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references public.shinobi_world_events(id) on delete cascade,
+  character_id uuid not null references public.shinobi_characters(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  allegiance text not null check (allegiance in ('village','rogue','independent')),
+  score integer not null default 0 check (score between 0 and 100),
+  success boolean not null default false,
+  contribution integer not null default 0 check (contribution >= 0),
+  reward jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  unique(event_id,character_id)
+);
+alter table public.shinobi_world_event_participation enable row level security;
+drop policy if exists "owners read event participation" on public.shinobi_world_event_participation;
+create policy "owners read event participation" on public.shinobi_world_event_participation for select using (auth.uid()=user_id);
+revoke insert,update,delete on public.shinobi_world_event_participation from anon,authenticated;
+
+create table if not exists public.rogue_shinobi_profiles (
+  character_id uuid primary key references public.shinobi_characters(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  rogue_since timestamptz not null default now(),
+  notoriety integer not null default 0 check (notoriety >= 0),
+  bounty integer not null default 0 check (bounty >= 0),
+  threat_class text not null default 'C' check (threat_class in ('D','C','B','A','S')),
+  rogue_title text not null default 'Missing-nin',
+  last_known_village text null,
+  updated_at timestamptz not null default now()
+);
+alter table public.rogue_shinobi_profiles enable row level security;
+drop policy if exists "owners read rogue profiles" on public.rogue_shinobi_profiles;
+create policy "owners read rogue profiles" on public.rogue_shinobi_profiles for select using (auth.uid()=user_id);
+revoke insert,update,delete on public.rogue_shinobi_profiles from anon,authenticated;
+
+create index if not exists world_events_active_idx on public.shinobi_world_events(status,starts_at,ends_at);
+create index if not exists world_event_participation_event_idx on public.shinobi_world_event_participation(event_id,contribution desc);
+create index if not exists rogue_shinobi_bingo_idx on public.rogue_shinobi_profiles(threat_class desc,bounty desc,notoriety desc);
+
+insert into public.shinobi_world_events(slug,title,event_type,description,target_village,difficulty,status,starts_at,ends_at)
+select 'crimson-eclipse-1','Crimson Eclipse','rogue_hunt','A coordinated missing-nin network has begun moving forbidden intelligence across village borders. Village shinobi are ordered to intercept couriers while rogue operatives can exploit the chaos for notoriety.','Konohagakure','A','active',now()-interval '1 day',now()+interval '30 days'
+where not exists(select 1 from public.shinobi_world_events where status='active' and ends_at>now());
+
+create or replace function public.list_active_world_events()
+returns jsonb
+language sql
+security definer
+set search_path=public
+stable
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id',e.id,'slug',e.slug,'title',e.title,'event_type',e.event_type,'description',e.description,
+    'target_village',e.target_village,'difficulty',e.difficulty,'status',e.status,'starts_at',e.starts_at,'ends_at',e.ends_at,
+    'participants',(select count(*) from public.shinobi_world_event_participation p where p.event_id=e.id),
+    'total_contribution',(select coalesce(sum(p.contribution),0) from public.shinobi_world_event_participation p where p.event_id=e.id)
+  ) order by e.starts_at desc),'[]'::jsonb)
+  from public.shinobi_world_events e
+  where e.status='active' and e.starts_at<=now() and e.ends_at>now();
+$$;
+revoke all on function public.list_active_world_events() from public;
+grant execute on function public.list_active_world_events() to anon,authenticated;
+
+create or replace function public.become_rogue(p_character_id uuid)
+returns public.rogue_shinobi_profiles
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  v_user uuid:=auth.uid();
+  v_progress public.shinobi_progression%rowtype;
+  v_village text;
+  v_row public.rogue_shinobi_profiles%rowtype;
+begin
+  if v_user is null then raise exception 'Authentication required.'; end if;
+  if not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=v_user) then raise exception 'Character not found.'; end if;
+  select * into v_progress from public.shinobi_progression where character_id=p_character_id and user_id=v_user;
+  if not found or v_progress.level<8 or v_progress.completed_missions<5 then raise exception 'Rogue status requires level 8 and at least 5 completed missions.'; end if;
+  select village_id into v_village from public.village_memberships where character_id=p_character_id and user_id=v_user;
+  delete from public.village_memberships where character_id=p_character_id and user_id=v_user;
+  insert into public.rogue_shinobi_profiles(character_id,user_id,notoriety,bounty,threat_class,rogue_title,last_known_village,updated_at)
+  values(p_character_id,v_user,greatest(10,v_progress.level*3),greatest(500,v_progress.level*250),
+    case when v_progress.level>=35 then 'S' when v_progress.level>=25 then 'A' when v_progress.level>=16 then 'B' else 'C' end,
+    'Missing-nin',v_village,now())
+  on conflict(character_id) do update set updated_at=now()
+  returning * into v_row;
+  update public.shinobi_progression set current_title='Missing-nin',updated_at=now() where character_id=p_character_id and user_id=v_user;
+  return v_row;
+end;
+$$;
+revoke all on function public.become_rogue(uuid) from public,anon;
+grant execute on function public.become_rogue(uuid) to authenticated;
+
+create or replace function public.renounce_rogue_status(p_character_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare v_user uuid:=auth.uid();
+begin
+  if v_user is null then raise exception 'Authentication required.'; end if;
+  if not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=v_user) then raise exception 'Character not found.'; end if;
+  delete from public.rogue_shinobi_profiles where character_id=p_character_id and user_id=v_user;
+  update public.shinobi_progression set current_title='Independent Shinobi',updated_at=now() where character_id=p_character_id and user_id=v_user;
+  return true;
+end;
+$$;
+revoke all on function public.renounce_rogue_status(uuid) from public,anon;
+grant execute on function public.renounce_rogue_status(uuid) to authenticated;
+
+create or replace function public.get_shinobi_rogue_profile(p_character_id uuid)
+returns public.rogue_shinobi_profiles
+language plpgsql
+security definer
+set search_path=public
+stable
+as $$
+declare v_row public.rogue_shinobi_profiles%rowtype;
+begin
+  if auth.uid() is null or not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=auth.uid()) then return null; end if;
+  select * into v_row from public.rogue_shinobi_profiles where character_id=p_character_id and user_id=auth.uid();
+  return v_row;
+end;
+$$;
+revoke all on function public.get_shinobi_rogue_profile(uuid) from public,anon;
+grant execute on function public.get_shinobi_rogue_profile(uuid) to authenticated;
+
+create or replace function public.list_public_bingo_book(p_limit integer default 30)
+returns jsonb
+language sql
+security definer
+set search_path=public
+stable
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'character_id',r.character_id,'name',coalesce(c.shinobi_alias,c.name),'public_slug',c.public_slug,'portrait_url',c.portrait_url,
+    'clan',c.clan,'chakra_primary',c.chakra_primary,'rank',c.rank,'threat_class',r.threat_class,'bounty',r.bounty,
+    'notoriety',r.notoriety,'rogue_title',r.rogue_title,'last_known_village',r.last_known_village,'rogue_since',r.rogue_since
+  ) order by r.bounty desc,r.notoriety desc),'[]'::jsonb)
+  from (
+    select rp.* from public.rogue_shinobi_profiles rp
+    join public.shinobi_characters pc on pc.id=rp.character_id and pc.is_public=true and pc.public_slug is not null
+    order by rp.bounty desc,rp.notoriety desc limit least(50,greatest(1,p_limit))
+  ) r join public.shinobi_characters c on c.id=r.character_id;
+$$;
+revoke all on function public.list_public_bingo_book(integer) from public;
+grant execute on function public.list_public_bingo_book(integer) to anon,authenticated;
+
+create or replace function public.participate_world_event(p_event_id uuid,p_character_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  v_user uuid:=auth.uid();
+  e public.shinobi_world_events%rowtype;
+  p public.shinobi_progression%rowtype;
+  rogue public.rogue_shinobi_profiles%rowtype;
+  is_rogue boolean:=false;
+  has_village boolean:=false;
+  v_score integer;
+  v_threshold integer;
+  v_success boolean;
+  v_contribution integer;
+  v_tp integer;
+  v_ryo integer;
+  v_rep integer;
+  v_allegiance text;
+  v_row public.shinobi_world_event_participation%rowtype;
+  v_seed integer;
+begin
+  if v_user is null then raise exception 'Authentication required.'; end if;
+  if not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=v_user) then raise exception 'Character not found.'; end if;
+  if exists(select 1 from public.shinobi_world_event_participation where event_id=p_event_id and character_id=p_character_id) then raise exception 'This shinobi has already participated in this event.'; end if;
+  select * into e from public.shinobi_world_events where id=p_event_id and status='active' and starts_at<=now() and ends_at>now();
+  if not found then raise exception 'World event is not active.'; end if;
+  select * into p from public.shinobi_progression where character_id=p_character_id and user_id=v_user;
+  if not found or p.level<3 then raise exception 'World events require level 3.'; end if;
+  select * into rogue from public.rogue_shinobi_profiles where character_id=p_character_id and user_id=v_user;
+  is_rogue:=found;
+  select exists(select 1 from public.village_memberships where character_id=p_character_id and user_id=v_user) into has_village;
+  v_allegiance:=case when is_rogue then 'rogue' when has_village then 'village' else 'independent' end;
+  v_seed:=abs(hashtext(p_event_id::text||p_character_id::text))%21;
+  v_score:=least(100, greatest(1, 28+p.level+(p.completed_missions*2)+least(20,(coalesce((select sum(value::int) from jsonb_each_text(coalesce(p.training_bonuses,'{}'::jsonb))),0)))+v_seed));
+  v_threshold:=case e.difficulty when 'D' then 35 when 'C' then 45 when 'B' then 55 when 'A' then 65 else 75 end;
+  v_success:=v_score>=v_threshold;
+  v_contribution:=case when v_success then greatest(10,v_score-v_threshold+25) else greatest(3,v_score/10) end;
+  v_tp:=case e.difficulty when 'D' then 1 when 'C' then 2 when 'B' then 3 when 'A' then 5 else 8 end;
+  v_ryo:=case e.difficulty when 'D' then 80 when 'C' then 160 when 'B' then 300 when 'A' then 550 else 900 end;
+  v_rep:=case e.difficulty when 'D' then 5 when 'C' then 10 when 'B' then 18 when 'A' then 30 else 50 end;
+  if not v_success then v_tp:=1; v_ryo:=v_ryo/3; v_rep:=v_rep/3; end if;
+
+  insert into public.shinobi_world_event_participation(event_id,character_id,user_id,allegiance,score,success,contribution,reward)
+  values(e.id,p_character_id,v_user,v_allegiance,v_score,v_success,v_contribution,
+    jsonb_build_object('training_points',v_tp,'ryo',v_ryo,'reputation',case when is_rogue then 0 else v_rep end,'notoriety',case when is_rogue then v_rep else 0 end))
+  returning * into v_row;
+
+  update public.shinobi_progression set training_points=training_points+v_tp,ryo=ryo+v_ryo,
+    village_reputation=village_reputation+case when is_rogue then 0 else v_rep end,updated_at=now()
+  where character_id=p_character_id and user_id=v_user;
+  if is_rogue then
+    update public.rogue_shinobi_profiles set notoriety=notoriety+v_rep,bounty=bounty+(v_rep*75),
+      threat_class=case when notoriety+v_rep>=180 then 'S' when notoriety+v_rep>=110 then 'A' when notoriety+v_rep>=60 then 'B' when notoriety+v_rep>=25 then 'C' else 'D' end,
+      updated_at=now() where character_id=p_character_id and user_id=v_user;
+  end if;
+  return jsonb_build_object('participation',to_jsonb(v_row),'score',v_score,'success',v_success,'contribution',v_contribution,
+    'message',case when v_success then 'World-event objective completed.' else 'The operation fell short, but field experience was gained.' end);
+end;
+$$;
+revoke all on function public.participate_world_event(uuid,uuid) from public,anon;
+grant execute on function public.participate_world_event(uuid,uuid) to authenticated;
+
+create or replace function public.list_my_world_event_participation(p_character_id uuid)
+returns setof public.shinobi_world_event_participation
+language sql
+security definer
+set search_path=public
+stable
+as $$
+  select p.* from public.shinobi_world_event_participation p
+  join public.shinobi_characters c on c.id=p.character_id
+  where p.character_id=p_character_id and c.user_id=auth.uid()
+  order by p.created_at desc limit 30;
+$$;
+revoke all on function public.list_my_world_event_participation(uuid) from public,anon;
+grant execute on function public.list_my_world_event_participation(uuid) to authenticated;
+
+-- Rejoin village clears rogue status so allegiance remains singular.
+create or replace function public.join_village(p_character_id uuid,p_village_id text)
+returns public.village_memberships
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare v_user uuid:=auth.uid(); v_row public.village_memberships%rowtype;
+begin
+  if v_user is null then raise exception 'Authentication required.'; end if;
+  if p_village_id not in ('Konohagakure','Sunagakure','Kumogakure','Iwagakure','Kirigakure') then raise exception 'Unknown village.'; end if;
+  if not exists(select 1 from public.shinobi_characters where id=p_character_id and user_id=v_user) then raise exception 'Character not found.'; end if;
+  delete from public.rogue_shinobi_profiles where character_id=p_character_id and user_id=v_user;
+  insert into public.village_memberships(character_id,user_id,village_id,joined_at,updated_at)
+  values(p_character_id,v_user,p_village_id,now(),now())
+  on conflict(character_id) do update set village_id=excluded.village_id,user_id=excluded.user_id,updated_at=now()
+  returning * into v_row;
+  return v_row;
+end;
+$$;
+revoke all on function public.join_village(uuid,text) from public,anon;
+grant execute on function public.join_village(uuid,text) to authenticated;
+
+-- ============================================================================
+-- Release metadata — V11.3.0+
+-- ============================================================================
+insert into public.app_release_metadata(key,value,updated_at)
+values('schema_version','11.3.0',now())
+on conflict(key) do update set value=excluded.value,updated_at=excluded.updated_at;

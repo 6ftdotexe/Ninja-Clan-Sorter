@@ -72,3 +72,11 @@ export interface ChuninExamEntry{id:string;user_id:string;character_id:string;se
 export interface CompetitiveRecord{character_id:string;season_id:string;user_id:string;season_points:number;exams_entered:number;exams_completed:number;exam_wins:number;best_finish:string;updated_at:string}
 export interface CompetitiveLeaderboardEntry{character_id:string;name:string;public_slug:string|null;portrait_url:string|null;village:string|null;season_points:number;exams_completed:number;exam_wins:number;best_finish:string}
 export interface ExamAdvanceResult{entry:ChuninExamEntry;score:number;passed:boolean;message:string;season_points_awarded:number}
+
+
+export type WorldEventType='invasion'|'rogue_hunt'|'disaster'|'scroll_theft'|'border_conflict'|'summoning_outbreak';
+export interface WorldEvent{id:string;slug:string;title:string;event_type:WorldEventType;description:string;target_village:VillageId|null;difficulty:MissionRank;status:'upcoming'|'active'|'resolved';starts_at:string;ends_at:string;participants:number;total_contribution:number}
+export interface WorldEventParticipation{id:string;event_id:string;character_id:string;user_id:string;allegiance:'village'|'rogue'|'independent';score:number;success:boolean;contribution:number;reward:{training_points?:number;ryo?:number;reputation?:number;notoriety?:number};created_at:string}
+export interface WorldEventResult{participation:WorldEventParticipation;score:number;success:boolean;contribution:number;message:string}
+export interface RogueProfile{character_id:string;user_id:string;rogue_since:string;notoriety:number;bounty:number;threat_class:'D'|'C'|'B'|'A'|'S';rogue_title:string;last_known_village:VillageId|null;updated_at:string}
+export interface BingoBookEntry{character_id:string;name:string;public_slug:string;portrait_url:string|null;clan:string|null;chakra_primary:string|null;rank:string|null;threat_class:'D'|'C'|'B'|'A'|'S';bounty:number;notoriety:number;rogue_title:string;last_known_village:VillageId|null;rogue_since:string}

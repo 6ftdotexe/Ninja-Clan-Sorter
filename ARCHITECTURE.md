@@ -238,3 +238,10 @@ V10.5.0 adds HashRouter-safe Stripe returns, production HSTS/API no-store behavi
 ## V11 Phase 3 competitive layer
 
 `src/features/competitive.ts` owns season/exam data access and `src/pages/CompetitivePages.tsx` owns the Chūnin Exams and seasonal leaderboard UI. Supabase remains authoritative for registration, stage scoring, rewards, and competitive records.
+
+
+## V11 Phase 4 world-state layer
+
+Phase 4 keeps world-state logic inside the existing `world` feature boundary. `shinobi_world_events` describes active incidents, `shinobi_world_event_participation` records one authoritative result per character/event, and `rogue_shinobi_profiles` stores missing-nin status separately from village membership. Server-authoritative RPCs resolve participation rewards and rogue notoriety. Public Bingo Book reads return whitelisted public character fields only.
+
+Routes: `/world`, `/rogue`, `/bingo-book`.

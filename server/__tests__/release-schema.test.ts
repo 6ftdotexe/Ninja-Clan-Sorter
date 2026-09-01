@@ -7,7 +7,7 @@ import { runPreflight } from '../preflight.js';
 describe('release contract', () => {
   it('keeps package.json aligned with the server release', async () => {
     await expect(verifyPackageVersion()).resolves.toBeUndefined();
-    expect(APP_VERSION).toBe('11.2.0');
+    expect(APP_VERSION).toBe('11.3.0');
   });
 
   it('ships the TypeScript runtime used by npm start as a production dependency', async () => {
@@ -16,8 +16,8 @@ describe('release contract', () => {
     expect(pkg.devDependencies?.tsx).toBeUndefined();
   });
 
-  it('expects the Phase 3 schema version', () => {
-    expect(EXPECTED_SCHEMA_VERSION).toBe('11.2.0');
+  it('expects the Phase 4 schema version', () => {
+    expect(EXPECTED_SCHEMA_VERSION).toBe('11.3.0');
   });
 
   it('reports a matching frontend/server/schema release contract', async () => {
@@ -74,6 +74,14 @@ describe('Supabase security/schema contracts', () => {
       'create or replace function public.advance_chunin_exam(',
       'create or replace function public.get_shinobi_competitive_record(',
       'create or replace function public.list_competitive_leaderboard(',
+      'create table if not exists public.shinobi_world_events',
+      'create table if not exists public.shinobi_world_event_participation',
+      'create table if not exists public.rogue_shinobi_profiles',
+      'create or replace function public.list_active_world_events()',
+      'create or replace function public.participate_world_event(',
+      'create or replace function public.become_rogue(',
+      'create or replace function public.renounce_rogue_status(',
+      'create or replace function public.list_public_bingo_book(',
     ];
     for (const contract of required) expect(sql.toLowerCase()).toContain(contract.toLowerCase());
   });
