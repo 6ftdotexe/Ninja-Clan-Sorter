@@ -257,3 +257,7 @@ Routes: `/world`, `/rogue`, `/bingo-book`.
 Phase 5 keeps social warfare in a compact `warfare` feature boundary. `shinobi_team_operations` stores server-resolved cooperative squad deployments, while `village_war_seasons` and `village_war_deployments` provide a persistent cross-village seasonal competition. Team operations may use the full squad for composition but only owned characters receive progression rewards. Village-war deployments require at least two owned characters with one shared formal village allegiance, preventing users from committing another player's public character to a village war. Public war standings are aggregate-only and expose no account ownership data.
 
 The Phase 5 routes are `/operations` and `/wars`; both reuse the existing consolidated SocialPages UI module and shared social navigation to avoid re-expanding the route-file structure.
+
+
+## V11.5.3 Chūnin Exam Event
+The exam UI uses `ExamAdventure` in `src/lib/minigames.tsx` as a client-side playable gate for the existing server-authoritative Chūnin Exam RPC. Tactical, survival, preliminary, and finals stages each use distinct interaction patterns while Supabase remains the source of truth for official scores, qualification, season points, and progression rewards. No schema change is required beyond the V11.4.0 database.

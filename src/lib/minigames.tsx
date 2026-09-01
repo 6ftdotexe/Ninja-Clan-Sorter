@@ -188,6 +188,78 @@ export function MissionAdventure({title,difficulty=55,objective,location,onCompl
   </div></div>;
 }
 
+
+export type ExamAdventureResult={score:number;passed:boolean;segments:string[];segmentScores:number[]};
+type ExamAdventureProps={stage:'tactical'|'survival'|'preliminaries'|'finals';title:string;difficulty?:number;onComplete:(result:ExamAdventureResult)=>void|Promise<void>;onCancel:()=>void};
+
+const WRITTEN_QUESTIONS=[
+  {q:'Your squad is ordered to recover intelligence, but an ally is injured before extraction. What best demonstrates Chūnin judgment?',choices:['Abandon the objective immediately','Protect the ally while preserving the intelligence and adapting extraction','Pursue the enemy alone','Wait for another squad to decide'],best:1},
+  {q:'Two routes reach the objective. One is fast but exposes civilians; the other is slower and controlled.',choices:['Choose the fastest route regardless','Use the controlled route and preserve the mission objective','Split the squad without a plan','Cancel the mission'],best:1},
+  {q:'An opponent is deliberately provoking you during an evaluation.',choices:['Attack immediately','Ignore all mission conditions','Maintain discipline and force them to reveal their plan','Leave the arena'],best:2},
+  {q:'Your information is incomplete and the team is divided on the next move.',choices:['Commit everyone to the first idea','Gather the highest-value missing information before committing','Let each member act independently','Do nothing'],best:1},
+  {q:'A superior gives an order that conflicts with the stated mission priority.',choices:['Follow blindly','Clarify the conflict and protect the mission priority','Ignore the superior without explanation','Quit the exam'],best:1},
+];
+const FOREST_CHOICES=[
+  {name:'Entry Route',prompt:'A rival team controls the obvious trail into the survival zone.',choices:[['Move through the canopy and preserve concealment',100],['Shadow the rival team from a safe distance',72],['Challenge them immediately',45]] as [string,number][]},
+  {name:'Resource Decision',prompt:'Your squad has limited water and a teammate is exhausted.',choices:[['Redistribute supplies and shorten the next route',100],['Keep the original pace and ration evenly',70],['Leave the teammate behind',20]] as [string,number][]},
+  {name:'Scroll Encounter',prompt:'You locate the required scroll, but another team is approaching.',choices:[['Secure the scroll, create distance, and avoid unnecessary battle',100],['Set an ambush while keeping an escape route',78],['Stand in the open and wait',35]] as [string,number][]},
+];
+const OPPONENTS=[
+  {name:'Ren Kurogane',style:'Pressure Fighter',detail:'Fast close-range pressure with strong counters.',kind:'training' as ActivityKind,mod:4},
+  {name:'Mika Shiosai',style:'Control Specialist',detail:'Patient spacing, traps, and chakra control.',kind:'mastery' as ActivityKind,mod:7},
+  {name:'Daichi Arashi',style:'Adaptive Tactician',detail:'Reads habits and changes tempo between exchanges.',kind:'exam' as ActivityKind,mod:10},
+];
+
+export function ExamAdventure({stage,title,difficulty=60,onComplete,onCancel}:ExamAdventureProps){
+  const [phase,setPhase]=useState(0);
+  const [scores,setScores]=useState<number[]>([]);
+  const [segments,setSegments]=useState<string[]>([]);
+  const [challenge,setChallenge]=useState<{kind:ActivityKind;label:string;difficulty:number}|null>(null);
+  const [finished,setFinished]=useState(false);
+  const passMark=threshold(difficulty);
+  const finalScore=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;
+  const finish=(nextScores:number[],nextSegments:string[])=>{setScores(nextScores);setSegments(nextSegments);setFinished(true)};
+  const add=(label:string,value:number)=>{const ns=[...scores,Math.round(clamp(value))];const nl=[...segments,label];setScores(ns);setSegments(nl);return [ns,nl] as const};
+
+  if(challenge){
+    return <ActivityChallenge kind={challenge.kind} title={`${title} · ${challenge.label}`} difficulty={challenge.difficulty} focus="Your execution determines whether you control this exam encounter." onCancel={()=>setChallenge(null)} onComplete={(result)=>{
+      const [ns,nl]=add(challenge.label,result.score);setChallenge(null);
+      if(stage==='survival'){finish(ns,nl);return;}
+      if(stage==='preliminaries'){if(scores.length===0)return;finish(ns,nl);return;}
+      if(stage==='finals'){if(phase===0){setPhase(1);return;}finish(ns,nl);return;}
+    }}/>;
+  }
+
+  if(finished){
+    const passed=finalScore>=passMark;
+    return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">CHŪNIN EXAM EVENT</span><h3>{title}</h3><p>Stage debrief</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className={`activity-result ${passed?'passed':'failed'}`}><strong>{finalScore}</strong><h3>{passed?'Stage Cleared':'Stage Failed'}</h3><p className="muted">Interactive target: {Math.round(passMark)}. The official server evaluation will still combine this stage clear with your shinobi career and build.</p><div className="activity-rounds">{segments.map((label,index)=><span key={`${label}-${index}`}>{label}: {scores[index]??0}</span>)}</div><button className="btn primary" onClick={()=>void onComplete({score:finalScore,passed,segments,segmentScores:scores})}>{passed?'Submit Stage for Official Evaluation':'Record Failed Attempt'}</button></div></div></div>;
+  }
+
+  if(stage==='tactical'){
+    const q=WRITTEN_QUESTIONS[phase%WRITTEN_QUESTIONS.length];
+    const answer=(index:number)=>{const value=index===q.best?100:index===((q.best+1)%q.choices.length)?60:25;const [ns,nl]=add(`Question ${phase+1}`,value);if(phase>=2)finish(ns,nl);else setPhase(v=>v+1)};
+    return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">WRITTEN EXAM · QUESTION {phase+1}/3</span><h3>{title}</h3><p>Judgment matters more than speed.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-event-progress"><i style={{width:`${phase/3*100}%`}}/></div><div className="activity-stage"><h4>{q.q}</h4><div className="tactic-options">{q.choices.map((choice,index)=><button className="btn secondary" key={choice} onClick={()=>answer(index)}>{choice}</button>)}</div></div></div></div>;
+  }
+
+  if(stage==='survival'){
+    if(phase<FOREST_CHOICES.length){const part=FOREST_CHOICES[phase];const choose=(label:string,value:number)=>{add(part.name,value);if(phase>=FOREST_CHOICES.length-1){setPhase(v=>v+1);setChallenge({kind:'mission',label:'Forest Extraction',difficulty:clamp(difficulty+8,30,95)});}else setPhase(v=>v+1)};return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">SURVIVAL EXERCISE · {phase+1}/4</span><h3>Forest of Trial</h3><p>Your earlier decisions carry into the extraction run.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-forest-card"><span>{part.name.toUpperCase()}</span><h4>{part.prompt}</h4><div className="mission-route-grid">{part.choices.map(([label,value])=><button key={label} onClick={()=>choose(label,value)}><strong>{label}</strong><small>{value>=90?'Disciplined':value>=60?'Risky':'Reckless'} approach</small></button>)}</div></div></div></div>}
+  }
+
+  if(stage==='preliminaries'){
+    const opponent=OPPONENTS[phase===0?0:1];
+    if(phase===0&&scores.length===0){return <div className="activity-overlay" role="dialog" aria-modal="true"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">PRELIMINARY BATTLE</span><h3>Select Your Opponent</h3><p>Different fighting styles produce different execution pressure.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-opponents">{OPPONENTS.map((op,index)=><button key={op.name} onClick={()=>{setSegments([]);setScores([]);setPhase(index+10);setChallenge({kind:op.kind,label:`Bout vs ${op.name}`,difficulty:clamp(difficulty+op.mod,35,96)})}}><strong>{op.name}</strong><span>{op.style}</span><small>{op.detail}</small></button>)}</div></div></div>}
+    if(phase>=10&&scores.length===1){return <div className="activity-overlay"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">PRELIMINARY BATTLE</span><h3>Final Exchange</h3><p>Your opponent adjusts after the opening exchange.</p></div></div><div className="exam-fight-card"><strong>Score after opening: {scores[0]}</strong><p>Choose how to close the match.</p><div className="tactic-options"><button className="btn secondary" onClick={()=>setChallenge({kind:'training',label:'Counterattack Exchange',difficulty:clamp(difficulty+8,35,96)})}>Counterattack</button><button className="btn secondary" onClick={()=>setChallenge({kind:'mastery',label:'Technique Finish',difficulty:clamp(difficulty+10,35,96)})}>Technique Finish</button></div></div></div></div>}
+  }
+
+  if(stage==='finals'){
+    const bout=phase===0?'Semifinal':'Championship Final';
+    const opponent=phase===0?OPPONENTS[1]:OPPONENTS[2];
+    return <div className="activity-overlay"><div className="activity-panel exam-adventure"><div className="activity-head"><div><span className="eyebrow">FINAL TOURNAMENT</span><h3>{bout}</h3><p>Win both bracket bouts to post a championship-level execution score.</p></div><button className="mini-link" onClick={onCancel}>Exit</button></div><div className="exam-bracket"><div className={phase===0?'active':'done'}><span>SEMIFINAL</span><strong>{scores[0]!==undefined?`Cleared · ${scores[0]}`:opponent.name}</strong></div><div className={phase===1?'active':''}><span>FINAL</span><strong>{phase===1?OPPONENTS[2].name:'Locked'}</strong></div></div><div className="exam-fight-card"><strong>{opponent.name} · {opponent.style}</strong><p>{opponent.detail}</p><button className="btn primary" onClick={()=>setChallenge({kind:phase===0?'team':'war',label:bout,difficulty:clamp(difficulty+(phase===0?5:12),40,98)})}>Enter {bout}</button></div></div></div>;
+  }
+
+  return null;
+}
+
 function TimingRound({spec,difficulty,onDone}:{spec:RoundSpec;difficulty:number;onDone:(score:number)=>void}){
   const [marker,setMarker]=useState(0);
   const [direction,setDirection]=useState(1);

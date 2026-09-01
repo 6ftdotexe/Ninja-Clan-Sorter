@@ -1,5 +1,15 @@
 # Changelog
 
+## V11.5.3 — Chūnin Exam Event Upgrade
+- Replaced generic exam-stage mini-games with a playable multi-part Chūnin Exam event.
+- Added a three-question written judgment examination.
+- Added Forest of Trial survival choices with a final extraction challenge.
+- Added opponent selection and multi-exchange preliminary battles.
+- Added semifinal and championship-final tournament bracket encounters.
+- Kept official qualification and season scoring server-authoritative through the existing exam RPC.
+- No Supabase schema migration is required; expected schema remains 11.4.0.
+
+
 ## V11.5.2 — Multi-Stage Mission Adventures
 - Replaced the single mission mini-game with a three-stage mission run: Infiltration, Objective, and Extraction.
 - Added route choices with persistent risk/reward modifiers.
